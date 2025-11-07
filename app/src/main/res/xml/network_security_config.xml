@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext traffic for specific IP address -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">62.84.112.89</domain>
+    </domain-config>
+    
+    <!-- For development: allow all cleartext traffic (remove in production!) -->
+    <!-- Uncomment only for development/testing -->
+    <!--
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    -->
+</network-security-config>
+
