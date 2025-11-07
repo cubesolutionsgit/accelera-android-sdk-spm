@@ -335,6 +335,11 @@ class FullscreenActivity : Activity() {
     private inner class StoryCardAdapter : androidx.recyclerview.widget.RecyclerView.Adapter<StoryCardViewHolder>() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoryCardViewHolder {
             val divView = DivKitSetup.makeView(this@FullscreenActivity, jsonData)
+            // ViewPager2 requires pages to fill the whole ViewPager2 (use match_parent)
+            divView.layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
             return StoryCardViewHolder(divView)
         }
 
