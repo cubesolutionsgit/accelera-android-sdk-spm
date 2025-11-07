@@ -55,12 +55,20 @@ internal class AcceleraUrlHandler(
         when (actionType) {
             "fullscreen" -> {
                 val id = uri.getQueryParameter("id") ?: return false
-                val intent = Intent(context, FullscreenActivity::class.java).apply {
+                
+                // Get Activity context for starting activity
+                val activity = context as? Activity
+                    ?: (context as? android.content.ContextWrapper)?.baseContext as? Activity
+                    ?: run {
+                        Accelera.shared.error("No Activity context available to start FullscreenActivity")
+                        return false
+                    }
+                
+                val intent = Intent(activity, FullscreenActivity::class.java).apply {
                     putExtra("jsonData", jsonData)
                     putExtra("entryId", id)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                context.startActivity(intent)
+                activity.startActivity(intent)
                 return true
             }
 

@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ai.accelera.library.Accelera
@@ -136,42 +135,15 @@ fun ExampleScreen(modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = "Loads stories content from API. Tap to open fullscreen.",
+                    text = "Loads stories content from API. Tap on a story to open fullscreen.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 
-                // Stories composable
+                // Stories composable - displays horizontal ribbon of stories
+                // Click handling for fullscreen is done via div-action://fullscreen in AcceleraUrlHandler
                 AcceleraStories(
                     data = mapOf(
                         "type" to "stories"
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-        
-        // Example: Custom banner with parameters
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Custom Banner Example",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Banner with custom parameters",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                
-                AcceleraBanner(
-                    data = mapOf(
-                        "type" to "banner",
-                        "category" to "main_screen",
-                        "user_segment" to "premium"
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )

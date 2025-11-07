@@ -105,9 +105,10 @@ fun AcceleraBanner(
 
 /**
  * Composable for displaying Accelera stories (horizontal scrollable).
- * Note: For fullscreen stories, use the FullscreenActivity.
+ * Stories are displayed as a horizontal ribbon, clicking on a story opens FullscreenActivity.
+ * This uses the same mechanism as AcceleraBanner, just with different data parameters.
  *
- * @param data Optional JSON data to send to the backend for loading content
+ * @param data Optional JSON data to send to the backend for loading content (should contain "type": "stories")
  * @param modifier Modifier for the composable
  */
 @Composable
@@ -115,9 +116,8 @@ fun AcceleraStories(
     data: Map<String, Any?>? = null,
     modifier: Modifier = Modifier
 ) {
-    // Stories are typically displayed in a horizontal scrollable list
-    // For now, we'll use the same banner implementation
-    // Fullscreen stories are handled by FullscreenActivity
+    // Stories use the same implementation as banners - just different data
+    // The click handling for fullscreen is done via div-action://fullscreen in AcceleraUrlHandler
     AcceleraBanner(data = data, modifier = modifier)
 }
 
