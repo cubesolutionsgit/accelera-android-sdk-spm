@@ -235,8 +235,11 @@ class FullscreenActivity : Activity() {
             bar.progress = if (i < index) 1f else 0f
         }
 
-        // Update ViewPager
-        (viewPager.adapter as? StoryCardAdapter)?.notifyDataSetChanged()
+        // Update ViewPager - postpone notifyDataSetChanged to avoid IllegalStateException
+        // during layout pass
+        viewPager.post {
+            (viewPager.adapter as? StoryCardAdapter)?.notifyDataSetChanged()
+        }
         viewPager.setCurrentItem(index, false)
 
         // Log view event
