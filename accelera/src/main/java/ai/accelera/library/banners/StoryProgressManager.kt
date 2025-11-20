@@ -157,9 +157,16 @@ class StoryProgressManager(
      * Stops progress animation and cleans up.
      */
     fun stopProgress() {
+        // Remove all callbacks for this runnable
         handler.removeCallbacks(progressUpdateRunnable)
+        
+        // Cancel animator and remove listeners
         progressAnimator?.cancel()
+        progressAnimator?.removeAllUpdateListeners()
+        progressAnimator?.removeAllListeners()
         progressAnimator = null
+        
+        // Reset state
         isPaused = false
         pausedDuration = 0
         pauseStartTime = 0
@@ -178,8 +185,24 @@ class StoryProgressManager(
      * Cleans up resources.
      */
     fun cleanup() {
+        // Stop progress first
         stopProgress()
+        
+        // Remove all handler callbacks to prevent memory leaks
+        handler.removeCallbacksAndMessages(null)
+        
+        // Cancel and clear animator
+        progressAnimator?.cancel()
+        progressAnimator?.removeAllUpdateListeners()
+        progressAnimator?.removeAllListeners()
+        progressAnimator = null
+        
+        // Clear all references
         progressBars.clear()
+        isPaused = false
+        pausedDuration = 0
+        pauseStartTime = 0
+        currentCardIndex = -1
     }
 }
 

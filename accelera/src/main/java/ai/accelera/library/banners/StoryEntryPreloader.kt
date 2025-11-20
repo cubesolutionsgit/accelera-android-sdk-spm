@@ -1,6 +1,7 @@
 package ai.accelera.library.banners
 
 import android.content.Context
+import android.view.ViewGroup
 import com.yandex.div.core.view2.Div2View
 import org.json.JSONObject
 
@@ -60,11 +61,29 @@ class StoryEntryPreloader(
         }
         
         // Clean up entries that are too far away (keep only current + 2 adjacent)
+        // Also limit cache size to prevent memory issues (max 5 entries)
         val entriesToKeep = entriesToLoad.toSet()
-        cache.keys.toList().forEach { cachedEntryId ->
+        val entriesToRemove = mutableListOf<String>()
+        
+        cache.keys.forEach { cachedEntryId ->
             if (!entriesToKeep.contains(cachedEntryId)) {
-                releaseEntry(cachedEntryId)
+                entriesToRemove.add(cachedEntryId)
             }
+        }
+        
+        // Aggressively limit cache size to prevent memory issues (max 3 entries)
+        if (cache.size > 3) {
+            val sortedKeys = cache.keys.toList()
+            val excessCount = cache.size - 3
+            for (i in 0 until excessCount) {
+                if (i < sortedKeys.size && !entriesToKeep.contains(sortedKeys[i])) {
+                    entriesToRemove.add(sortedKeys[i])
+                }
+            }
+        }
+        
+        entriesToRemove.forEach { entryId ->
+            releaseEntry(entryId)
         }
         
         currentEntryId = if (currentEntryIndex >= 0 && currentEntryIndex < entryIds.size) {
@@ -129,6 +148,27 @@ class StoryEntryPreloader(
      * Releases resources for a specific entry.
      */
     fun releaseEntry(entryId: String) {
+        val entryCache = cache[entryId] ?: return
+        
+        // Release all Div2View resources before removing from cache
+        entryCache.cardViews.values.forEach { divView ->
+            try {
+                // Cancel any animations
+                divView.clearAnimation()
+                divView.animate()?.cancel()
+                
+                // Remove from parent if attached
+                // This will automatically trigger resource cleanup in Div2View
+                (divView.parent as? ViewGroup)?.removeView(divView)
+            } catch (e: Exception) {
+                // Ignore errors during cleanup
+            }
+        }
+        
+        // Clear cardViews map
+        entryCache.cardViews.clear()
+        
+        // Remove from cache
         cache.remove(entryId)
     }
 
@@ -136,6 +176,10 @@ class StoryEntryPreloader(
      * Clears all cached entries.
      */
     fun clearCache() {
+        // Release all entries before clearing
+        cache.keys.toList().forEach { entryId ->
+            releaseEntry(entryId)
+        }
         cache.clear()
         currentEntryId = ""
     }

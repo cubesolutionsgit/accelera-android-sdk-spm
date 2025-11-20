@@ -252,7 +252,41 @@ class StoryEntryAnimator(
      * Resets all animations and view states.
      */
     fun reset() {
+        cancelAllAnimations()
         isAnimating = false
+    }
+    
+    /**
+     * Cancels all active animations on all child views.
+     * This prevents memory leaks when Activity is destroyed.
+     */
+    fun cancelAllAnimations() {
+        try {
+            // Cancel animations on all child views recursively
+            cancelAnimationsRecursive(rootView)
+        } catch (e: Exception) {
+            // Ignore errors during cleanup
+        }
+    }
+    
+    /**
+     * Recursively cancels animations on a view and its children.
+     */
+    private fun cancelAnimationsRecursive(view: View) {
+        try {
+            // Cancel animations on this view
+            view.clearAnimation()
+            view.animate()?.cancel()
+            
+            // Recursively cancel animations on children
+            if (view is ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    cancelAnimationsRecursive(view.getChildAt(i))
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore errors during cleanup
+        }
     }
 }
 

@@ -73,8 +73,9 @@ class StoryGestureHandler(
             }
 
             override fun onSingleTapUp(e: MotionEvent): Boolean {
-                // Don't handle tap if we were dragging
-                if (isDragging) {
+                // Don't handle tap if we were dragging (swipe detected)
+                // This ensures swipes work everywhere, including middle area
+                if (isDragging || isSwipeDetected) {
                     return false
                 }
 
@@ -91,16 +92,29 @@ class StoryGestureHandler(
                     return false
                 }
 
-                // Determine if tap is on left or right half
-                val isRightHalf = tapX > screenWidth / 2
+                // Instagram-like behavior: taps for navigation work only on edges (left and right thirds)
+                // Middle third taps are ignored for navigation, but don't block other interactions
+                // Swipes work everywhere regardless of X position
+                val leftThird = screenWidth / 3f
+                val rightThird = screenWidth * 2f / 3f
 
-                if (isRightHalf) {
-                    listener.onTapRight()
-                } else {
-                    listener.onTapLeft()
+                when {
+                    tapX < leftThird -> {
+                        // Tap on left edge - navigate to previous
+                        listener.onTapLeft()
+                        return true
+                    }
+                    tapX > rightThird -> {
+                        // Tap on right edge - navigate to next
+                        listener.onTapRight()
+                        return true
+                    }
+                    else -> {
+                        // Tap in middle third - ignore for navigation (return false to allow other handlers)
+                        // This doesn't block swipes or other interactions
+                        return false
+                    }
                 }
-
-                return true
             }
 
             override fun onFling(
@@ -332,6 +346,28 @@ class StoryGestureHandler(
         initialY = 0f
         lastMoveX = 0f
         lastMoveY = 0f
+    }
+    
+    /**
+     * Cleans up all resources and cancels all pending operations.
+     * Should be called when the handler is no longer needed (e.g., Activity.onDestroy).
+     */
+    fun cleanup() {
+        // Remove all handler callbacks to prevent memory leaks
+        handler.removeCallbacksAndMessages(null)
+        
+        // Cancel any pending swipe actions
+        pendingSwipeAction?.let { handler.removeCallbacks(it) }
+        pendingSwipeAction = null
+        
+        // Remove touch listener from root view
+        rootView.setOnTouchListener(null)
+        
+        // Reset all state
+        resetState()
+        
+        // Clear callback reference
+        isTransitioning = { false }
     }
 }
 
