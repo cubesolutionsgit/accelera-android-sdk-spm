@@ -60,8 +60,9 @@ object AcceleraBanners {
                 Accelera.shared.log("Content loaded")
 
                 try {
-                    // Activity implements LifecycleOwner
-                    val divView = DivKitSetup.makeView(activity, jsonData)
+                    // Activity may implement LifecycleOwner (AppCompatActivity does)
+                    val lifecycleOwner = activity as? androidx.lifecycle.LifecycleOwner
+                    val divView = DivKitSetup.makeView(activity, jsonData, lifecycleOwner)
                     
                     container.addView(divView)
                     

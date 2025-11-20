@@ -2,35 +2,36 @@ package ai.accelera.library.banners
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.utils.toJsonBytes
-import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.LifecycleOwner
 import org.json.JSONObject
 
 /**
  * Fullscreen activity for displaying stories with improved architecture.
  * Uses custom View instead of ViewPager2 for better control and preloading.
  */
-class FullscreenActivity : Activity() {
+class FullscreenActivity : AppCompatActivity() {
 
     private lateinit var jsonData: ByteArray
     private var viewState = StoryViewState()
-    
+
     private lateinit var rootLayout: FrameLayout
     private lateinit var currentCardContainer: StoryCardContainerView
     private lateinit var progressContainer: ViewGroup
-    
+
     private lateinit var dataRepository: StoryDataRepository
     private lateinit var progressManager: StoryProgressManager
     private lateinit var navigationUseCase: StoryNavigationUseCase
     private lateinit var entryPreloader: StoryEntryPreloader
     private lateinit var entryAnimator: StoryEntryAnimator
     private lateinit var gestureHandler: StoryGestureHandler
-    
+
     private var isTransitioning = false
     private var transitionStartTime = 0L
     private val minTransitionDuration = 200L  // Minimum transition duration for smooth UX
@@ -45,23 +46,23 @@ class FullscreenActivity : Activity() {
 
         setupUI()
         initializeComponents()
-        
+
         // Load entry IDs
         val entryIds = dataRepository.loadEntryIds()
         val entryIndex = entryIds.indexOf(entryId).coerceAtLeast(0)
-        
+
         viewState = viewState.copy(
             currentEntryId = entryId,
             currentEntryIndex = entryIndex,
             entryIds = entryIds
         )
-        
+
         // Preload adjacent entries
         entryPreloader.preloadAdjacentEntries(entryIds, entryIndex)
-        
+
         // Load initial entry
         loadEntry(entryId, isInitialLoad = true)
-        
+
         // Animate opening (from bottom to top)
         rootLayout.post {
             entryAnimator.animateOpen(rootLayout) {}
@@ -121,7 +122,7 @@ class FullscreenActivity : Activity() {
         rootLayout.addView(currentCardContainer)
         rootLayout.addView(progressContainer)
         rootLayout.addView(closeButton)
-        
+
         // Ensure progress bars are visible above cards
         progressContainer.elevation = 10f
         closeButton.elevation = 20f
@@ -150,7 +151,7 @@ class FullscreenActivity : Activity() {
             context = this,
             jsonData = jsonData,
             dataRepository = dataRepository,
-            makeDivView = { DivKitSetup.makeView(this, jsonData) }
+            makeDivView = { DivKitSetup.makeView(this, jsonData, this) }
         )
 
         // Initialize entry animator
@@ -190,10 +191,10 @@ class FullscreenActivity : Activity() {
                 }
             }
         )
-        
+
         // Set transition check callback
         gestureHandler.isTransitioning = { isTransitioning }
-        
+
         gestureHandler.setupTouchListener()
     }
 
@@ -205,15 +206,19 @@ class FullscreenActivity : Activity() {
             is StoryNavigationUseCase.NavigationResult.NavigateToCard -> {
                 showCard(result.index)
             }
+
             is StoryNavigationUseCase.NavigationResult.NavigateToNextEntry -> {
                 moveToNextEntry()
             }
+
             is StoryNavigationUseCase.NavigationResult.NavigateToPrevEntry -> {
                 moveToPrevEntry()
             }
+
             is StoryNavigationUseCase.NavigationResult.Finish -> {
                 closeStories()
             }
+
             is StoryNavigationUseCase.NavigationResult.NoAction -> {
                 // Do nothing
             }
@@ -228,12 +233,12 @@ class FullscreenActivity : Activity() {
             if (!isInitialLoad) {
                 isTransitioning = true
             }
-            
+
             progressManager.stopProgress()
 
             // Try to get cached cards first
-            val cards = entryPreloader.getCachedCards(id) 
-                ?: dataRepository.loadEntryCards(id) 
+            val cards = entryPreloader.getCachedCards(id)
+                ?: dataRepository.loadEntryCards(id)
                 ?: run {
                     finish()
                     return
@@ -262,7 +267,7 @@ class FullscreenActivity : Activity() {
 
             // Show first card
             showCard(cardIndex, animate = !isInitialLoad)
-            
+
             if (!isInitialLoad) {
                 isTransitioning = false
             }
@@ -276,7 +281,11 @@ class FullscreenActivity : Activity() {
      * Sets up the card container with cards.
      * Uses cached views from preloader if available.
      */
-    private fun setupCardContainer(entryId: String, cards: List<JSONObject>, isInitialLoad: Boolean) {
+    private fun setupCardContainer(
+        entryId: String,
+        cards: List<JSONObject>,
+        isInitialLoad: Boolean
+    ) {
         // Get or create container for this entry
         val container = entryContainers.getOrPut(entryId) {
             if (entryId == viewState.currentEntryId) {
@@ -315,7 +324,11 @@ class FullscreenActivity : Activity() {
                 cards = cards,
                 entryId = entryId,
                 jsonData = jsonData,
-                makeDivView = { DivKitSetup.makeView(this, jsonData) }
+                makeDivView = {
+                    // Check if Activity implements LifecycleOwner (AppCompatActivity does, but Activity doesn't)
+                    val lifecycleOwner = if (this is LifecycleOwner) this else null
+                    DivKitSetup.makeView(this, jsonData, lifecycleOwner)
+                }
             )
         }
 
@@ -330,18 +343,18 @@ class FullscreenActivity : Activity() {
      */
     private fun showCard(index: Int, animate: Boolean = true) {
         if (isFinishing || isDestroyed) return
-        
+
         // Don't process during transitions
         if (isTransitioning) {
             return
         }
-        
+
         // Check if cards are available
         if (viewState.currentCards.isEmpty()) {
             Accelera.shared.error("showCard called but currentCards is empty")
             return
         }
-        
+
         // Validate index
         if (index < 0 || index >= viewState.currentCards.size) {
             // Try to navigate to adjacent entry
@@ -389,7 +402,7 @@ class FullscreenActivity : Activity() {
         if (isTransitioning || (currentTime - transitionStartTime < minTransitionDuration)) {
             return
         }
-        
+
         // Always try to move to next entry (swipe behavior)
         if (viewState.hasNextEntry && viewState.currentEntryIndex + 1 < viewState.entryIds.size) {
             val nextEntryId = viewState.entryIds[viewState.currentEntryIndex + 1]
@@ -416,7 +429,7 @@ class FullscreenActivity : Activity() {
         if (isTransitioning || (currentTime - transitionStartTime < minTransitionDuration)) {
             return
         }
-        
+
         // Always try to move to previous entry (swipe behavior)
         if (viewState.hasPrevEntry && viewState.currentEntryIndex > 0) {
             val prevEntryId = viewState.entryIds[viewState.currentEntryIndex - 1]
@@ -440,7 +453,7 @@ class FullscreenActivity : Activity() {
         if (isTransitioning || (currentTime - transitionStartTime < minTransitionDuration)) {
             return
         }
-        
+
         try {
             isTransitioning = true
             transitionStartTime = currentTime
@@ -448,7 +461,10 @@ class FullscreenActivity : Activity() {
 
             // Ensure entry is preloaded
             if (!entryPreloader.isCached(entryId)) {
-                entryPreloader.preloadAdjacentEntries(viewState.entryIds, viewState.currentEntryIndex)
+                entryPreloader.preloadAdjacentEntries(
+                    viewState.entryIds,
+                    viewState.currentEntryIndex
+                )
             }
 
             // Get or create container for target entry
@@ -468,7 +484,7 @@ class FullscreenActivity : Activity() {
             }
 
             // Load cards if container is not set up
-            val cards = entryPreloader.getCachedCards(entryId) 
+            val cards = entryPreloader.getCachedCards(entryId)
                 ?: dataRepository.loadEntryCards(entryId)
                 ?: run {
                     Accelera.shared.error("Failed to load cards for entry: $entryId")
@@ -509,15 +525,15 @@ class FullscreenActivity : Activity() {
                     // Cleanup old container if not needed
                     cleanupOldContainers()
                     currentCardContainer = targetContainer
-                    
+
                     // Reset gesture handler state after transition completes
                     gestureHandler.resetState()
-                    
+
                     // Start progress
                     val card = cards[cardIndex]
                     val duration = dataRepository.getCardDuration(card)
                     progressManager.showCard(cardIndex, duration)
-                    
+
                     // Log view event
                     try {
                         val meta = dataRepository.getCardMeta(card)
@@ -529,7 +545,7 @@ class FullscreenActivity : Activity() {
                     } catch (e: Exception) {
                         Accelera.shared.error("Error logging view event: ${e.message}")
                     }
-                    
+
                     // Mark transition complete after a small delay to ensure smooth UX
                     handler.postDelayed({
                         isTransitioning = false
@@ -540,15 +556,15 @@ class FullscreenActivity : Activity() {
                     // Cleanup old container if not needed
                     cleanupOldContainers()
                     currentCardContainer = targetContainer
-                    
+
                     // Reset gesture handler state after transition completes
                     gestureHandler.resetState()
-                    
+
                     // Start progress
                     val card = cards[cardIndex]
                     val duration = dataRepository.getCardDuration(card)
                     progressManager.showCard(cardIndex, duration)
-                    
+
                     // Log view event
                     try {
                         val meta = dataRepository.getCardMeta(card)
@@ -560,7 +576,7 @@ class FullscreenActivity : Activity() {
                     } catch (e: Exception) {
                         Accelera.shared.error("Error logging view event: ${e.message}")
                     }
-                    
+
                     // Mark transition complete after a small delay to ensure smooth UX
                     handler.postDelayed({
                         isTransitioning = false
@@ -579,7 +595,7 @@ class FullscreenActivity : Activity() {
     private fun cleanupOldContainers() {
         val currentEntryId = viewState.currentEntryId
         val currentIndex = viewState.currentEntryIndex
-        
+
         // Keep only current and adjacent entries
         val entriesToKeep = mutableSetOf<String>()
         if (currentIndex >= 0 && currentIndex < viewState.entryIds.size) {
@@ -591,7 +607,7 @@ class FullscreenActivity : Activity() {
         if (currentIndex >= 0 && currentIndex + 1 < viewState.entryIds.size) {
             entriesToKeep.add(viewState.entryIds[currentIndex + 1])
         }
-        
+
         // Remove containers that are not needed
         entryContainers.keys.toList().forEach { entryId ->
             if (!entriesToKeep.contains(entryId) && entryId != currentEntryId) {
@@ -611,7 +627,7 @@ class FullscreenActivity : Activity() {
         if (isTransitioning) {
             return
         }
-        
+
         entryAnimator.animateClose(rootLayout) {
             finish()
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
@@ -637,10 +653,10 @@ class FullscreenActivity : Activity() {
                 container.cleanup()
             }
             entryContainers.clear()
-            
+
             // Cleanup preloader
             entryPreloader.clearCache()
-            
+
             // Cleanup other components
             progressManager.cleanup()
             entryAnimator.reset()

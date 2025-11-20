@@ -5,7 +5,7 @@
     <application>
         <activity
             android:name="ai.accelera.library.banners.FullscreenActivity"
-            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="false" />
     </application>
 </manifest>

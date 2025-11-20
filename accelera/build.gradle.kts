@@ -63,6 +63,7 @@ dependencies {
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.appcompat)
 
     testImplementation(libs.junit)
 }

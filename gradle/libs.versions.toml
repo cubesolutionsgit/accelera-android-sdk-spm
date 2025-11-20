@@ -11,6 +11,7 @@ composeBom = "2024.09.00"
 divkit = "32.26.0"
 okhttp = "4.12.0"
 kotlinxSerialization = "1.7.0"
+appcompat = "1.7.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -35,6 +36,7 @@ yandex-div-lottie = { group = "com.yandex.div", name = "div-lottie", version.ref
 yandex-div-video = { group = "com.yandex.div", name = "div-video", version.ref = "divkit" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 
 [plugins]
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

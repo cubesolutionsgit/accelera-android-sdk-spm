@@ -22,8 +22,9 @@ fun AcceleraDivView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val divView = remember(jsonData) {
-        DivKitSetup.makeView(context, jsonData)
+        DivKitSetup.makeView(context, jsonData, lifecycleOwner)
     }
 
     LaunchedEffect(jsonData) {
