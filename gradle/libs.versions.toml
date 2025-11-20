@@ -8,7 +8,7 @@ espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.9.4"
 activityCompose = "1.11.0"
 composeBom = "2024.09.00"
-divkit = "32.24.0"
+divkit = "32.26.0"
 okhttp = "4.12.0"
 kotlinxSerialization = "1.7.0"
 
