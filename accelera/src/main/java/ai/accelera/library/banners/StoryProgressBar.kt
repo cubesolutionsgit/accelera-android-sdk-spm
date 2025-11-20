@@ -16,6 +16,8 @@ class StoryProgressBar @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    private val density = context.resources.displayMetrics.density
+
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.argb(76, 255, 255, 255) // 30% white
     }
@@ -33,7 +35,7 @@ class StoryProgressBar @JvmOverloads constructor(
     private var animator: ValueAnimator? = null
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val height = (2 * resources.displayMetrics.density).toInt()
+        val height = (2 * density).toInt()
         setMeasuredDimension(
             MeasureSpec.getSize(widthMeasureSpec),
             height

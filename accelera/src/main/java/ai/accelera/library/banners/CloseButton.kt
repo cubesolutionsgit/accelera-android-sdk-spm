@@ -6,7 +6,6 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
-import androidx.core.content.ContextCompat
 
 /**
  * Close button view for banners.
@@ -16,6 +15,8 @@ class CloseButton @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
+
+    private val density = context.resources.displayMetrics.density
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
@@ -39,7 +40,7 @@ class CloseButton @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val size = (24 * resources.displayMetrics.density).toInt()
+        val size = (24 * density).toInt()
         setMeasuredDimension(size, size)
     }
 
@@ -54,7 +55,7 @@ class CloseButton @JvmOverloads constructor(
         // Draw X
         val centerX = width / 2f
         val centerY = height / 2f
-        val halfLength = lineLength * resources.displayMetrics.density
+        val halfLength = lineLength * density
         
         // Draw two lines forming X
         canvas.drawLine(

@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
         // For demo purposes, using empty config - you can provide custom API via delegate
         Accelera.shared.configure(
             config = AcceleraConfig(
-                url = "http://62.84.112.89:3005", // Example URL for banner loading
+                url = "https://mcp.accelera.ai", // Example URL for banner loading
                 systemToken = "your-system-token" // Replace with your token
             )
         )
