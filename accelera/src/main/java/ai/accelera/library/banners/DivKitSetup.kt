@@ -49,12 +49,15 @@ internal object DivKitSetup {
     /**
      * Creates DivConfiguration with custom handlers.
      * ImageLoader is set via GlideImageLoader in the configuration.
+     * Uses Application context for Glide to avoid FragmentActivity requirement.
      */
     private fun createConfiguration(
         context: Context,
         jsonData: ByteArray
     ): DivConfiguration {
-        val imageLoader = GlideDivImageLoader(context)
+        // Use Application context for Glide to avoid FragmentActivity requirement
+        val glideContext = context.applicationContext ?: context
+        val imageLoader = GlideDivImageLoader(glideContext)
         
         return DivConfiguration.Builder(imageLoader)
             .actionHandler(AcceleraUrlHandler(context, jsonData))

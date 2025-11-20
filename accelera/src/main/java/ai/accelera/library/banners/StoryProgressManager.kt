@@ -52,6 +52,10 @@ class StoryProgressManager(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+            // Don't intercept touch events
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
         }
 
         cards.forEach { _ ->
@@ -63,6 +67,10 @@ class StoryProgressManager(
                 ).apply {
                     marginEnd = (4 * context.resources.displayMetrics.density).toInt()
                 }
+                // Don't intercept touch events
+                isClickable = false
+                isFocusable = false
+                isFocusableInTouchMode = false
             }
             container.addView(bar)
             progressBars.add(bar)

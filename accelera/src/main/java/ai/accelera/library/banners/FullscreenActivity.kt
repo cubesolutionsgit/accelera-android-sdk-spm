@@ -2,16 +2,18 @@ package ai.accelera.library.banners
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.utils.toJsonBytes
+import android.app.Activity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.app.Activity
-import androidx.viewpager2.widget.ViewPager2
 import org.json.JSONObject
 
 /**
  * Fullscreen activity for displaying stories with improved architecture.
+ * Uses custom View instead of ViewPager2 for better control and preloading.
  */
 class FullscreenActivity : Activity() {
 
@@ -19,18 +21,21 @@ class FullscreenActivity : Activity() {
     private var viewState = StoryViewState()
     
     private lateinit var rootLayout: FrameLayout
-    private lateinit var viewPager: ViewPager2
+    private lateinit var currentCardContainer: StoryCardContainerView
     private lateinit var progressContainer: ViewGroup
     
     private lateinit var dataRepository: StoryDataRepository
     private lateinit var progressManager: StoryProgressManager
-    private lateinit var navigationController: StoryNavigationController
+    private lateinit var navigationUseCase: StoryNavigationUseCase
+    private lateinit var entryPreloader: StoryEntryPreloader
     private lateinit var entryAnimator: StoryEntryAnimator
     private lateinit var gestureHandler: StoryGestureHandler
     
     private var isTransitioning = false
-    private var isTransitionComplete = false
-    private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
+    private var transitionStartTime = 0L
+    private val minTransitionDuration = 200L  // Minimum transition duration for smooth UX
+    private val entryContainers = mutableMapOf<String, StoryCardContainerView>()
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,13 +56,11 @@ class FullscreenActivity : Activity() {
             entryIds = entryIds
         )
         
-        navigationController.updateState(viewState)
+        // Preload adjacent entries
+        entryPreloader.preloadAdjacentEntries(entryIds, entryIndex)
         
         // Load initial entry
-        loadEntry(entryId)
-        
-        // Mark initial transition as complete since we're not transitioning between entries
-        isTransitionComplete = true
+        loadEntry(entryId, isInitialLoad = true)
         
         // Animate opening (from bottom to top)
         rootLayout.post {
@@ -84,36 +87,22 @@ class FullscreenActivity : Activity() {
                 marginStart = (8 * resources.displayMetrics.density).toInt()
                 marginEnd = (8 * resources.displayMetrics.density).toInt()
             }
+            // Don't intercept touch events - let gesture handler process them
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
         }
 
-        // ViewPager for cards
-        viewPager = ViewPager2(this).apply {
+        // Current card container
+        currentCardContainer = StoryCardContainerView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            isUserInputEnabled = false // Disable swipe - navigation will be via gestures
+            // Don't intercept touch events - let gesture handler process them
+            isClickable = false
+            isFocusable = false
         }
-        
-        // Setup page change callback
-        pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                // Only handle if not transitioning and transition is complete to avoid race conditions
-                if (!isTransitioning && isTransitionComplete && !isFinishing && !isDestroyed) {
-                    // Verify that position is valid for current cards
-                    if (position >= 0 && position < viewState.currentCards.size) {
-                        // Verify that adapter matches current state to prevent stale callbacks
-                        val currentAdapter = viewPager.adapter as? StoryCardAdapter
-                        if (currentAdapter != null && 
-                            currentAdapter.entryId == viewState.currentEntryId &&
-                            currentAdapter.cards.size == viewState.currentCards.size) {
-                            showCard(position)
-                        }
-                    }
-                }
-            }
-        }
-        viewPager.registerOnPageChangeCallback(pageChangeCallback!!)
 
         // Close button
         val closeButton = CloseButton(this).apply {
@@ -128,9 +117,14 @@ class FullscreenActivity : Activity() {
             }
         }
 
-        rootLayout.addView(viewPager)
+        // Add views in correct z-order: card container first, then progress bars on top, then close button
+        rootLayout.addView(currentCardContainer)
         rootLayout.addView(progressContainer)
         rootLayout.addView(closeButton)
+        
+        // Ensure progress bars are visible above cards
+        progressContainer.elevation = 10f
+        closeButton.elevation = 20f
 
         setContentView(rootLayout)
     }
@@ -144,17 +138,19 @@ class FullscreenActivity : Activity() {
             context = this,
             progressContainer = progressContainer,
             onProgressComplete = {
-                navigationController.navigateToNextCard()
+                handleNavigation(navigationUseCase.navigateToNext(viewState))
             }
         )
 
-        // Initialize navigation controller
-        navigationController = StoryNavigationController(
-            viewState = viewState,
-            onNavigateToCard = { index -> showCard(index) },
-            onNavigateToNextEntry = { moveToNextEntry() },
-            onNavigateToPrevEntry = { moveToPrevEntry() },
-            onFinish = { closeStories() }
+        // Initialize navigation use case
+        navigationUseCase = StoryNavigationUseCase()
+
+        // Initialize entry preloader
+        entryPreloader = StoryEntryPreloader(
+            context = this,
+            jsonData = jsonData,
+            dataRepository = dataRepository,
+            makeDivView = { DivKitSetup.makeView(this, jsonData) }
         )
 
         // Initialize entry animator
@@ -166,11 +162,11 @@ class FullscreenActivity : Activity() {
             rootView = rootLayout,
             listener = object : StoryGestureListener {
                 override fun onTapLeft() {
-                    navigationController.navigateToPrevCard()
+                    handleNavigation(navigationUseCase.navigateToPrev(viewState))
                 }
 
                 override fun onTapRight() {
-                    navigationController.navigateToNextCard()
+                    handleNavigation(navigationUseCase.navigateToNext(viewState))
                 }
 
                 override fun onSwipeLeft() {
@@ -195,24 +191,55 @@ class FullscreenActivity : Activity() {
             }
         )
         
+        // Set transition check callback
+        gestureHandler.isTransitioning = { isTransitioning }
+        
         gestureHandler.setupTouchListener()
     }
 
-    private fun loadEntry(id: String, lastCard: Boolean = false) {
+    /**
+     * Handles navigation result from use case.
+     */
+    private fun handleNavigation(result: StoryNavigationUseCase.NavigationResult) {
+        when (result) {
+            is StoryNavigationUseCase.NavigationResult.NavigateToCard -> {
+                showCard(result.index)
+            }
+            is StoryNavigationUseCase.NavigationResult.NavigateToNextEntry -> {
+                moveToNextEntry()
+            }
+            is StoryNavigationUseCase.NavigationResult.NavigateToPrevEntry -> {
+                moveToPrevEntry()
+            }
+            is StoryNavigationUseCase.NavigationResult.Finish -> {
+                closeStories()
+            }
+            is StoryNavigationUseCase.NavigationResult.NoAction -> {
+                // Do nothing
+            }
+        }
+    }
+
+    /**
+     * Loads an entry and sets up the card container.
+     */
+    private fun loadEntry(id: String, isInitialLoad: Boolean = false) {
         try {
-            // Mark as not transitioning during initial load
-            isTransitioning = false
-            isTransitionComplete = true
+            if (!isInitialLoad) {
+                isTransitioning = true
+            }
             
             progressManager.stopProgress()
 
-            val cards = dataRepository.loadEntryCards(id) ?: run {
-                finish()
-                return
-            }
+            // Try to get cached cards first
+            val cards = entryPreloader.getCachedCards(id) 
+                ?: dataRepository.loadEntryCards(id) 
+                ?: run {
+                    finish()
+                    return
+                }
 
             val entryIndex = viewState.entryIds.indexOf(id).coerceAtLeast(0)
-            // Always show first card (index 0) when loading entry
             val cardIndex = 0
 
             viewState = viewState.copy(
@@ -222,41 +249,90 @@ class FullscreenActivity : Activity() {
                 currentCardIndex = cardIndex
             )
 
-            navigationController.updateState(viewState)
+            // Preload adjacent entries
+            entryPreloader.preloadAdjacentEntries(viewState.entryIds, entryIndex)
 
             // Setup progress bars
             progressManager.setupProgressBars(cards) { card ->
                 dataRepository.hasDuration(card)
             }
 
-            // Update adapter
-            updateAdapter()
+            // Setup card container with cached or new views
+            setupCardContainer(id, cards, isInitialLoad)
 
-            // Show card
-            showCard(cardIndex)
+            // Show first card
+            showCard(cardIndex, animate = !isInitialLoad)
+            
+            if (!isInitialLoad) {
+                isTransitioning = false
+            }
         } catch (e: Exception) {
             Accelera.shared.error("Error in loadEntry: ${e.message}")
             finish()
         }
     }
 
-    private fun updateAdapter() {
-        val adapter = StoryCardAdapter(
-            jsonData = jsonData,
-            entryId = viewState.currentEntryId,
-            cards = viewState.currentCards,
-            makeDivView = { DivKitSetup.makeView(this, jsonData) }
-        )
-        
-        viewPager.adapter = adapter
+    /**
+     * Sets up the card container with cards.
+     * Uses cached views from preloader if available.
+     */
+    private fun setupCardContainer(entryId: String, cards: List<JSONObject>, isInitialLoad: Boolean) {
+        // Get or create container for this entry
+        val container = entryContainers.getOrPut(entryId) {
+            if (entryId == viewState.currentEntryId) {
+                // Use current container
+                currentCardContainer
+            } else {
+                // Create new container for preloaded entry
+                StoryCardContainerView(this).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    visibility = View.GONE
+                    // Ensure it doesn't intercept touch events
+                    isClickable = false
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    rootLayout.addView(this)
+                }
+            }
+        }
+
+        // Setup cards using cached views if available
+        val cachedViews = entryPreloader.getCachedCardViews(entryId)
+        if (cachedViews != null && cachedViews.size == cards.size) {
+            // Use cached views
+            container.setupCardsWithViews(
+                cards = cards,
+                entryId = entryId,
+                jsonData = jsonData,
+                cachedViews = cachedViews
+            )
+        } else {
+            // Create new views
+            container.setupCards(
+                cards = cards,
+                entryId = entryId,
+                jsonData = jsonData,
+                makeDivView = { DivKitSetup.makeView(this, jsonData) }
+            )
+        }
+
+        // Update current container reference
+        if (entryId == viewState.currentEntryId) {
+            currentCardContainer = container
+        }
     }
 
-    private fun showCard(index: Int) {
+    /**
+     * Shows a specific card.
+     */
+    private fun showCard(index: Int, animate: Boolean = true) {
         if (isFinishing || isDestroyed) return
         
-        // Don't process showCard during entry transitions to avoid race conditions
-        // Only allow if transition is complete or we're not transitioning at all
-        if (isTransitioning && !isTransitionComplete) {
+        // Don't process during transitions
+        if (isTransitioning) {
             return
         }
         
@@ -266,50 +342,19 @@ class FullscreenActivity : Activity() {
             return
         }
         
-        if (index < 0) {
-            if (!isTransitioning) {
-                navigationController.navigateToPrevCard()
-            }
-            return
-        }
-        if (index >= viewState.currentCards.size) {
-            // If trying to go beyond last card, try to go to next entry
-            // But only if we're not already transitioning
-            if (!isTransitioning) {
-                navigationController.navigateToNextCard()
-            }
+        // Validate index
+        if (index < 0 || index >= viewState.currentCards.size) {
+            // Try to navigate to adjacent entry
+            val result = navigationUseCase.navigateToCard(viewState, index)
+            handleNavigation(result)
             return
         }
 
         try {
             viewState = viewState.copy(currentCardIndex = index)
-            navigationController.updateState(viewState)
 
-            // Update ViewPager only if adapter matches
-            viewPager.post {
-                try {
-                    if (isFinishing || isDestroyed) return@post
-                    
-                    // Double-check we're not transitioning during the post callback
-                    if (isTransitioning && !isTransitionComplete) {
-                        return@post
-                    }
-                    
-                    val currentAdapter = viewPager.adapter as? StoryCardAdapter
-                    if (currentAdapter == null || 
-                        currentAdapter.entryId != viewState.currentEntryId ||
-                        currentAdapter.cards.size != viewState.currentCards.size) {
-                        updateAdapter()
-                    }
-                    
-                    // Only set current item if it's different to avoid unnecessary callbacks
-                    if (viewPager.currentItem != index) {
-                        viewPager.setCurrentItem(index, false)
-                    }
-                } catch (e: Exception) {
-                    Accelera.shared.error("Error updating ViewPager in showCard: ${e.message}")
-                }
-            }
+            // Show card in container
+            currentCardContainer.showCard(index, animate = animate)
 
             // Log view event
             try {
@@ -333,58 +378,113 @@ class FullscreenActivity : Activity() {
         }
     }
 
+    /**
+     * Moves to the next entry with animation.
+     * Used for swipes - always switches to next entry group regardless of current card position.
+     * Includes protection against rapid consecutive swipes.
+     */
     private fun moveToNextEntry() {
-        // Prevent navigation during transition
-        if (isTransitioning) return
+        // Enhanced protection: check both isTransitioning and time since last transition
+        val currentTime = System.currentTimeMillis()
+        if (isTransitioning || (currentTime - transitionStartTime < minTransitionDuration)) {
+            return
+        }
         
-        // Double-check state before navigation to ensure we have accurate information
-        val currentState = viewState
-        if (currentState.hasNextEntry && currentState.currentEntryIndex + 1 < currentState.entryIds.size) {
-            val nextEntryId = currentState.entryIds[currentState.currentEntryIndex + 1]
-            animateToEntry(nextEntryId, false)
+        // Always try to move to next entry (swipe behavior)
+        if (viewState.hasNextEntry && viewState.currentEntryIndex + 1 < viewState.entryIds.size) {
+            val nextEntryId = viewState.entryIds[viewState.currentEntryIndex + 1]
+            animateToEntry(nextEntryId, isPrevEntry = false)
         } else {
-            closeStories()
+            // Last entry - close stories (with delay to prevent accidental close)
+            handler.postDelayed({
+                if (!isTransitioning) {
+                    closeStories()
+                }
+            }, 100)
         }
     }
 
+    /**
+     * Moves to the previous entry with animation.
+     * Used for swipes - always switches to previous entry group regardless of current card position.
+     * If this is the first entry, closes stories (similar to last entry behavior).
+     * Includes protection against rapid consecutive swipes.
+     */
     private fun moveToPrevEntry() {
-        // Prevent navigation during transition
-        if (isTransitioning) return
+        // Enhanced protection: check both isTransitioning and time since last transition
+        val currentTime = System.currentTimeMillis()
+        if (isTransitioning || (currentTime - transitionStartTime < minTransitionDuration)) {
+            return
+        }
         
-        // Double-check state before navigation to ensure we have accurate information
-        val currentState = viewState
-        if (currentState.hasPrevEntry && currentState.currentEntryIndex > 0) {
-            val prevEntryId = currentState.entryIds[currentState.currentEntryIndex - 1]
-            animateToEntry(prevEntryId, true)
+        // Always try to move to previous entry (swipe behavior)
+        if (viewState.hasPrevEntry && viewState.currentEntryIndex > 0) {
+            val prevEntryId = viewState.entryIds[viewState.currentEntryIndex - 1]
+            animateToEntry(prevEntryId, isPrevEntry = true)
+        } else {
+            // First entry - close stories (with delay to prevent accidental close)
+            handler.postDelayed({
+                if (!isTransitioning) {
+                    closeStories()
+                }
+            }, 100)
         }
     }
 
+    /**
+     * Animates transition to a new entry.
+     */
     private fun animateToEntry(entryId: String, isPrevEntry: Boolean) {
-        if (isTransitioning) return // Prevent multiple simultaneous transitions
+        // Enhanced protection: check both flag and time
+        val currentTime = System.currentTimeMillis()
+        if (isTransitioning || (currentTime - transitionStartTime < minTransitionDuration)) {
+            return
+        }
         
         try {
             isTransitioning = true
-            isTransitionComplete = false // Mark transition as not complete yet
-            
-            // Stop progress first
+            transitionStartTime = currentTime
             progressManager.stopProgress()
 
-            // Load cards for new entry
-            val cards = dataRepository.loadEntryCards(entryId)
-            
-            if (cards == null || cards.isEmpty()) {
-                // If cards failed to load or empty, don't close - just stop transition
-                Accelera.shared.error("Failed to load cards for entry: $entryId")
-                isTransitioning = false
-                isTransitionComplete = true
-                return
+            // Ensure entry is preloaded
+            if (!entryPreloader.isCached(entryId)) {
+                entryPreloader.preloadAdjacentEntries(viewState.entryIds, viewState.currentEntryIndex)
             }
-            
+
+            // Get or create container for target entry
+            val targetContainer = entryContainers.getOrPut(entryId) {
+                StoryCardContainerView(this).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    visibility = View.GONE
+                    // Ensure it doesn't intercept touch events
+                    isClickable = false
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    rootLayout.addView(this)
+                }
+            }
+
+            // Load cards if container is not set up
+            val cards = entryPreloader.getCachedCards(entryId) 
+                ?: dataRepository.loadEntryCards(entryId)
+                ?: run {
+                    Accelera.shared.error("Failed to load cards for entry: $entryId")
+                    isTransitioning = false
+                    return
+                }
+
+            // Setup container if needed
+            if (targetContainer.getCardCount() == 0) {
+                setupCardContainer(entryId, cards, isInitialLoad = false)
+            }
+
             val entryIndex = viewState.entryIds.indexOf(entryId).coerceAtLeast(0)
-            // Always show first card (index 0) when transitioning to a new group
             val cardIndex = 0
 
-            // Update state AFTER successful card loading
+            // Update state
             viewState = viewState.copy(
                 currentEntryId = entryId,
                 currentEntryIndex = entryIndex,
@@ -392,160 +492,156 @@ class FullscreenActivity : Activity() {
                 currentCardIndex = cardIndex
             )
 
-            navigationController.updateState(viewState)
+            // Preload adjacent entries
+            entryPreloader.preloadAdjacentEntries(viewState.entryIds, entryIndex)
 
             // Setup progress bars
             progressManager.setupProgressBars(cards) { card ->
                 dataRepository.hasDuration(card)
             }
 
-            // Update adapter first
-            updateAdapter()
-            
-            // Wait for adapter to be ready before setting item
-            viewPager.post {
-                try {
-                    // Check if view is still valid
-                    if (!isFinishing && !isDestroyed) {
-                        // Set initial card position (first card, index 0)
-                        // This might trigger onPageSelected, but isTransitioning is still true
-                        viewPager.setCurrentItem(cardIndex, false)
-                        
-                        // Animate ViewPager transition
-                        val screenWidth = rootLayout.width.toFloat()
-                        if (screenWidth > 0) {
-                            val startTranslationX = if (isPrevEntry) -screenWidth else screenWidth
-                            
-                            // Cancel any ongoing animation
-                            viewPager.animate().cancel()
-                            
-                            // Set initial position
-                            viewPager.translationX = startTranslationX
-                            viewPager.alpha = 0.5f
+            // Show first card in target container
+            targetContainer.showCard(cardIndex, animate = false)
 
-                            // Animate in
-                            viewPager.animate()
-                                .translationX(0f)
-                                .alpha(1f)
-                                .setDuration(300L)
-                                .setListener(object : android.animation.AnimatorListenerAdapter() {
-                                    override fun onAnimationEnd(animation: android.animation.Animator) {
-                                        try {
-                                            if (!isFinishing && !isDestroyed) {
-                                                viewPager.translationX = 0f
-                                                viewPager.alpha = 1f
-                                                
-                                                // Start progress for the card before marking transition complete
-                                                // Don't call showCard here to avoid navigation logic
-                                                // Just start the progress animation directly
-                                                viewPager.post {
-                                                    if (!isFinishing && !isDestroyed) {
-                                                        val card = viewState.currentCards.getOrNull(cardIndex)
-                                                        if (card != null && cardIndex < viewState.currentCards.size) {
-                                                            // Log view event
-                                                            try {
-                                                                val meta = dataRepository.getCardMeta(card)
-                                                                val eventPayload = mapOf(
-                                                                    "event" to "view",
-                                                                    "meta" to meta.toString()
-                                                                )
-                                                                Accelera.shared.logEvent(eventPayload.toJsonBytes())
-                                                            } catch (e: Exception) {
-                                                                Accelera.shared.error("Error logging view event: ${e.message}")
-                                                            }
-                                                            
-                                                            // Start progress animation
-                                                            val duration = dataRepository.getCardDuration(card)
-                                                            progressManager.showCard(cardIndex, duration)
-                                                            
-                                                            // Mark transition as complete AFTER progress starts
-                                                            // This ensures onPageSelected can safely handle callbacks
-                                                            isTransitionComplete = true
-                                                            isTransitioning = false
-                                                        } else {
-                                                            // Fallback if card is null
-                                                            isTransitionComplete = true
-                                                            isTransitioning = false
-                                                        }
-                                                    } else {
-                                                        isTransitionComplete = true
-                                                        isTransitioning = false
-                                                    }
-                                                }
-                                            } else {
-                                                isTransitionComplete = true
-                                                isTransitioning = false
-                                            }
-                                        } catch (e: Exception) {
-                                            Accelera.shared.error("Error in animation end: ${e.message}")
-                                            isTransitionComplete = true
-                                            isTransitioning = false
-                                        }
-                                    }
-                                    
-                                    override fun onAnimationCancel(animation: android.animation.Animator) {
-                                        isTransitionComplete = true
-                                        isTransitioning = false
-                                    }
-                                })
-                                .start()
-                        } else {
-                            // View not measured yet, skip animation
-                            // Still need to start progress and mark transition complete
-                            viewPager.post {
-                                if (!isFinishing && !isDestroyed) {
-                                    val card = viewState.currentCards.getOrNull(cardIndex)
-                                    if (card != null) {
-                                        val duration = dataRepository.getCardDuration(card)
-                                        progressManager.showCard(cardIndex, duration)
-                                    }
-                                }
-                                isTransitionComplete = true
-                                isTransitioning = false
-                            }
-                        }
-                    } else {
-                        isTransitionComplete = true
-                        isTransitioning = false
+            // Animate transition
+            if (isPrevEntry) {
+                entryAnimator.animateToPrevEntry(currentCardContainer, targetContainer) {
+                    // Cleanup old container if not needed
+                    cleanupOldContainers()
+                    currentCardContainer = targetContainer
+                    
+                    // Reset gesture handler state after transition completes
+                    gestureHandler.resetState()
+                    
+                    // Start progress
+                    val card = cards[cardIndex]
+                    val duration = dataRepository.getCardDuration(card)
+                    progressManager.showCard(cardIndex, duration)
+                    
+                    // Log view event
+                    try {
+                        val meta = dataRepository.getCardMeta(card)
+                        val eventPayload = mapOf(
+                            "event" to "view",
+                            "meta" to meta.toString()
+                        )
+                        Accelera.shared.logEvent(eventPayload.toJsonBytes())
+                    } catch (e: Exception) {
+                        Accelera.shared.error("Error logging view event: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Accelera.shared.error("Error in animateToEntry post: ${e.message}")
-                    isTransitionComplete = true
-                    isTransitioning = false
+                    
+                    // Mark transition complete after a small delay to ensure smooth UX
+                    handler.postDelayed({
+                        isTransitioning = false
+                    }, 50)
+                }
+            } else {
+                entryAnimator.animateToNextEntry(currentCardContainer, targetContainer) {
+                    // Cleanup old container if not needed
+                    cleanupOldContainers()
+                    currentCardContainer = targetContainer
+                    
+                    // Reset gesture handler state after transition completes
+                    gestureHandler.resetState()
+                    
+                    // Start progress
+                    val card = cards[cardIndex]
+                    val duration = dataRepository.getCardDuration(card)
+                    progressManager.showCard(cardIndex, duration)
+                    
+                    // Log view event
+                    try {
+                        val meta = dataRepository.getCardMeta(card)
+                        val eventPayload = mapOf(
+                            "event" to "view",
+                            "meta" to meta.toString()
+                        )
+                        Accelera.shared.logEvent(eventPayload.toJsonBytes())
+                    } catch (e: Exception) {
+                        Accelera.shared.error("Error logging view event: ${e.message}")
+                    }
+                    
+                    // Mark transition complete after a small delay to ensure smooth UX
+                    handler.postDelayed({
+                        isTransitioning = false
+                    }, 50)
                 }
             }
         } catch (e: Exception) {
             Accelera.shared.error("Error in animateToEntry: ${e.message}")
-            isTransitionComplete = true
             isTransitioning = false
         }
     }
 
+    /**
+     * Cleans up containers that are no longer needed.
+     */
+    private fun cleanupOldContainers() {
+        val currentEntryId = viewState.currentEntryId
+        val currentIndex = viewState.currentEntryIndex
+        
+        // Keep only current and adjacent entries
+        val entriesToKeep = mutableSetOf<String>()
+        if (currentIndex >= 0 && currentIndex < viewState.entryIds.size) {
+            entriesToKeep.add(viewState.entryIds[currentIndex])
+        }
+        if (currentIndex > 0) {
+            entriesToKeep.add(viewState.entryIds[currentIndex - 1])
+        }
+        if (currentIndex >= 0 && currentIndex + 1 < viewState.entryIds.size) {
+            entriesToKeep.add(viewState.entryIds[currentIndex + 1])
+        }
+        
+        // Remove containers that are not needed
+        entryContainers.keys.toList().forEach { entryId ->
+            if (!entriesToKeep.contains(entryId) && entryId != currentEntryId) {
+                val container = entryContainers.remove(entryId)
+                container?.let {
+                    if (it != currentCardContainer) {
+                        rootLayout.removeView(it)
+                        it.cleanup()
+                    }
+                }
+            }
+        }
+    }
+
     private fun closeStories() {
+        // Protection: don't close if transitioning (prevents accidental closes during rapid swipes)
+        if (isTransitioning) {
+            return
+        }
+        
         entryAnimator.animateClose(rootLayout) {
             finish()
-            // Use default transition instead of 0,0 to avoid resource ID errors
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         }
     }
 
     override fun onPause() {
         super.onPause()
-        // Pause progress when activity is paused (app minimized)
         progressManager.pauseProgress()
     }
 
     override fun onResume() {
         super.onResume()
-        // Resume progress when activity is resumed (app restored)
         progressManager.resumeProgress()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         try {
-            pageChangeCallback?.let { viewPager.unregisterOnPageChangeCallback(it) }
-            viewPager.animate().cancel()
+            // Cleanup all containers
+            entryContainers.values.forEach { container ->
+                rootLayout.removeView(container)
+                container.cleanup()
+            }
+            entryContainers.clear()
+            
+            // Cleanup preloader
+            entryPreloader.clearCache()
+            
+            // Cleanup other components
             progressManager.cleanup()
             entryAnimator.reset()
         } catch (e: Exception) {

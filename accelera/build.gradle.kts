@@ -62,10 +62,6 @@ dependencies {
     // Serialization
     implementation(libs.kotlinx.serialization.json)
     
-    // ViewPager2 for fullscreen stories
-    implementation("androidx.viewpager2:viewpager2:1.1.0")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
-    
     testImplementation(libs.junit)
 }
 
