@@ -31,6 +31,8 @@ yandex-div = { group = "com.yandex.div", name = "div", version.ref = "divkit" }
 yandex-div-core = { group = "com.yandex.div", name = "div-core", version.ref = "divkit" }
 yandex-div-json = { group = "com.yandex.div", name = "div-json", version.ref = "divkit" }
 yandex-div-glide = { group = "com.yandex.div", name = "glide", version.ref = "divkit" }
+yandex-div-lottie = { group = "com.yandex.div", name = "div-lottie", version.ref = "divkit" }
+yandex-div-video = { group = "com.yandex.div", name = "div-video", version.ref = "divkit" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 

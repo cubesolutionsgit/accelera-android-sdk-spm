@@ -49,19 +49,21 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.material3)
-    
+
     // DivKit
     implementation(libs.yandex.div)
     implementation(libs.yandex.div.core)
     implementation(libs.yandex.div.json)
     implementation(libs.yandex.div.glide)
-    
+    implementation(libs.yandex.div.lottie)
+    implementation(libs.yandex.div.video)
+
     // Networking
     implementation(libs.okhttp)
-    
+
     // Serialization
     implementation(libs.kotlinx.serialization.json)
-    
+
     testImplementation(libs.junit)
 }
 
@@ -70,7 +72,7 @@ afterEvaluate {
         publications {
             create<MavenPublication>("release") {
                 from(components["release"])
-                
+
                 groupId = "com.github.cubesolutionsgit"
                 artifactId = "accelera"
                 version = "0.4.1"

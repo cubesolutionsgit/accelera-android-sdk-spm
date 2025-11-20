@@ -11,6 +11,9 @@ import com.yandex.div.core.view2.Div2View
 import com.yandex.div.data.DivParsingEnvironment
 import com.yandex.div.glide.GlideDivImageLoader
 import com.yandex.div.json.ParsingErrorLogger
+import com.yandex.div.lottie.DivLottieExtensionHandler
+import com.yandex.div.lottie.DivLottieRawResProvider
+import com.yandex.div.video.ExoDivPlayerFactory
 import com.yandex.div2.DivData
 import org.json.JSONObject
 
@@ -50,18 +53,40 @@ internal object DivKitSetup {
      * Creates DivConfiguration with custom handlers.
      * ImageLoader is set via GlideImageLoader in the configuration.
      * Uses Application context for Glide to avoid FragmentActivity requirement.
+     * Registers Lottie extension handler and ExoPlayer factory for video support.
      */
     private fun createConfiguration(
         context: Context,
         jsonData: ByteArray
     ): DivConfiguration {
         // Use Application context for Glide to avoid FragmentActivity requirement
-        val glideContext = context.applicationContext ?: context
-        val imageLoader = GlideDivImageLoader(glideContext)
+        val appContext = context.applicationContext ?: context
+        val imageLoader = GlideDivImageLoader(appContext)
+        
+        // Create Lottie raw resource provider (supports URL loading)
+        val lottieRawResProvider = object : DivLottieRawResProvider {
+            override fun provideRes(url: String): Int? {
+                // Return null for URL-based resources (loaded from network)
+                return null
+            }
+            
+            override fun provideAssetFile(url: String): String? {
+                // Return null for URL-based resources (loaded from network)
+                return null
+            }
+        }
+        
+        // Create Lottie extension handler
+        val lottieExtensionHandler = DivLottieExtensionHandler(lottieRawResProvider)
+        
+        // Create ExoPlayer factory for video support
+        val exoPlayerFactory = ExoDivPlayerFactory(appContext)
         
         return DivConfiguration.Builder(imageLoader)
             .actionHandler(AcceleraUrlHandler(context, jsonData))
             .divErrorsReporter(createErrorLogger())
+            .extension(lottieExtensionHandler)
+            .divPlayerFactory(exoPlayerFactory)
             .build()
     }
 
