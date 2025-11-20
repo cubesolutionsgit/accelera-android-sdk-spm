@@ -1,4 +1,4 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.data.repository
 
 import ai.accelera.library.Accelera
 import org.json.JSONObject
@@ -74,4 +74,3 @@ class StoryDataRepository(private val jsonData: ByteArray) {
         return card.optJSONObject("card")?.optJSONObject("meta") ?: JSONObject()
     }
 }
-

@@ -1,4 +1,4 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.infrastructure.divkit
 
 import android.content.Context
 import ai.accelera.library.Accelera
@@ -144,3 +144,4 @@ internal object DivKitSetup {
         }.getOrNull()
     }
 }
+

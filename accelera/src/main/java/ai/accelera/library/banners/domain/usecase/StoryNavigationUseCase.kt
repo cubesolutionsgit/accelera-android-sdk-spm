@@ -1,4 +1,6 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.domain.usecase
+
+import ai.accelera.library.banners.domain.model.StoryViewState
 
 /**
  * Use case for story navigation logic.
@@ -126,4 +128,3 @@ class StoryNavigationUseCase {
         return state.hasPrevCard || state.hasPrevEntry
     }
 }
-

@@ -1,4 +1,4 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.domain.model
 
 import org.json.JSONObject
 
@@ -33,4 +33,3 @@ data class StoryViewState(
     val isSingleCard: Boolean
         get() = currentCards.size == 1
 }
-

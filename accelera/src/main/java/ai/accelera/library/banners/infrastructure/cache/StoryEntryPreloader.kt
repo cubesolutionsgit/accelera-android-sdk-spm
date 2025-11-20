@@ -1,7 +1,10 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.infrastructure.cache
 
 import android.content.Context
 import android.view.ViewGroup
+import ai.accelera.library.banners.data.repository.StoryDataRepository
+import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
+import com.yandex.div.DivDataTag
 import com.yandex.div.core.view2.Div2View
 import org.json.JSONObject
 
@@ -107,7 +110,7 @@ class StoryEntryPreloader(
             val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
             val divData = DivKitSetup.parseDivData(cardBytes)
             if (divData != null) {
-                val tag = com.yandex.div.DivDataTag("story_${entryId}_$index")
+                val tag = DivDataTag("story_${entryId}_$index")
                 divView.setData(divData, tag)
             }
             entryCache.cardViews[index] = divView

@@ -5,6 +5,8 @@ import ai.accelera.library.utils.closable
 import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.parentActivity
 import ai.accelera.library.utils.toJsonBytes
+import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
+import ai.accelera.library.banners.presentation.ui.CloseButton
 import android.view.ViewGroup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

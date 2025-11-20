@@ -2,8 +2,8 @@ package ai.accelera.library.compose
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.AcceleraBanners
-import ai.accelera.library.banners.CloseButton
-import ai.accelera.library.banners.DivKitSetup
+import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
+import ai.accelera.library.banners.presentation.ui.CloseButton
 import ai.accelera.library.utils.closable
 import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.toJsonBytes

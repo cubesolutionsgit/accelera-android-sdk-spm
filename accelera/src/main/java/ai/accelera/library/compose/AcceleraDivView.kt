@@ -1,6 +1,6 @@
 package ai.accelera.library.compose
 
-import ai.accelera.library.banners.DivKitSetup
+import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.*

@@ -1,12 +1,12 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.presentation.manager
 
 import android.animation.ValueAnimator
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.LinearLayout
+import ai.accelera.library.banners.presentation.ui.StoryProgressBar
 import org.json.JSONObject
 
 /**

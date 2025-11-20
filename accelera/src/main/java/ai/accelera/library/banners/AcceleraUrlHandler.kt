@@ -1,9 +1,10 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.infrastructure.divkit
 
 import android.content.Context
 import android.net.Uri
 import ai.accelera.library.Accelera
 import ai.accelera.library.utils.toJsonBytes
+import ai.accelera.library.banners.presentation.ui.FullscreenActivity
 import android.app.Activity
 import android.content.Intent
 import com.yandex.div.core.DivActionHandler

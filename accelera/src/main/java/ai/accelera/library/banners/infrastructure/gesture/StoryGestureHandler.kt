@@ -1,4 +1,4 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.infrastructure.gesture
 
 import android.content.Context
 import android.os.Handler

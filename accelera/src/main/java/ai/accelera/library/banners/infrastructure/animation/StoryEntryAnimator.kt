@@ -1,9 +1,10 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.infrastructure.animation
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.view.View
 import android.view.ViewGroup
+import ai.accelera.library.banners.presentation.ui.StoryCardContainerView
 
 /**
  * Handles animations for story entry transitions.

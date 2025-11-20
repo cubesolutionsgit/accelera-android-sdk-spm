@@ -1,4 +1,4 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.presentation.ui
 
 import android.content.Context
 import android.util.AttributeSet
@@ -6,6 +6,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import com.yandex.div.DivDataTag
 import com.yandex.div.core.view2.Div2View
 import org.json.JSONObject
@@ -182,7 +183,7 @@ class StoryCardContainerView @JvmOverloads constructor(
                 // Cancel any animations on the view being hidden
                 currentView.clearAnimation()
                 currentView.animate()?.cancel()
-                
+
                 if (animate) {
                     currentView.animate()
                         .alpha(0f)
@@ -262,4 +263,3 @@ class StoryCardContainerView @JvmOverloads constructor(
         entryId = ""
     }
 }
-

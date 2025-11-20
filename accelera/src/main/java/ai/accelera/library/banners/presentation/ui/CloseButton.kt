@@ -1,4 +1,4 @@
-package ai.accelera.library.banners
+package ai.accelera.library.banners.presentation.ui
 
 import android.content.Context
 import android.graphics.Canvas
