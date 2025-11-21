@@ -1,12 +1,13 @@
 package ai.accelera.library.banners.infrastructure.divkit
 
-import android.content.Context
-import android.net.Uri
 import ai.accelera.library.Accelera
-import ai.accelera.library.utils.toJsonBytes
 import ai.accelera.library.banners.presentation.ui.FullscreenActivity
+import ai.accelera.library.utils.toJsonBytes
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.net.Uri
 import com.yandex.div.core.DivActionHandler
 import com.yandex.div.core.DivViewFacade
 import com.yandex.div.json.expressions.ExpressionResolver
@@ -30,7 +31,7 @@ internal class AcceleraUrlHandler(
         super.handleAction(action, view, resolver)
         val url = action.url ?: return false
 
-        Accelera.shared.log("Divkit action: $url")
+        Accelera.Companion.shared.log("Divkit action: $url")
 
         val uri = action.url?.evaluate(view.expressionResolver) ?: return false
         if (uri.scheme != "div-action") return false
@@ -51,20 +52,20 @@ internal class AcceleraUrlHandler(
             "meta" to meta
         )
 
-        Accelera.shared.logEvent(payload.toJsonBytes())
+        Accelera.Companion.shared.logEvent(payload.toJsonBytes())
 
         when (actionType) {
             "fullscreen" -> {
                 val id = uri.getQueryParameter("id") ?: return false
-                
+
                 // Get Activity context for starting activity
                 val activity = context as? Activity
-                    ?: (context as? android.content.ContextWrapper)?.baseContext as? Activity
+                    ?: (context as? ContextWrapper)?.baseContext as? Activity
                     ?: run {
-                        Accelera.shared.error("No Activity context available to start FullscreenActivity")
+                        Accelera.Companion.shared.error("No Activity context available to start FullscreenActivity")
                         return false
                     }
-                
+
                 val intent = Intent(activity, FullscreenActivity::class.java).apply {
                     putExtra("jsonData", jsonData)
                     putExtra("entryId", id)
@@ -78,13 +79,13 @@ internal class AcceleraUrlHandler(
                 if (urlParam != null) {
                     try {
                         val finalUrl = Uri.parse(urlParam)
-                        Accelera.shared.handleUrl(finalUrl)
+                        Accelera.Companion.shared.handleUrl(finalUrl)
                         return true
                     } catch (e: Exception) {
-                        Accelera.shared.error("Could not construct URL from: $urlParam")
+                        Accelera.Companion.shared.error("Could not construct URL from: $urlParam")
                     }
                 } else {
-                    Accelera.shared.error("No 'url' parameter found in link action")
+                    Accelera.Companion.shared.error("No 'url' parameter found in link action")
                 }
             }
 
@@ -97,7 +98,7 @@ internal class AcceleraUrlHandler(
             }
 
             else -> {
-                Accelera.shared.error("Unknown div-action type: $actionType")
+                Accelera.Companion.shared.error("Unknown div-action type: $actionType")
             }
         }
         return false
