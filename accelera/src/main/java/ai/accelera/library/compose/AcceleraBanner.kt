@@ -35,8 +35,9 @@ fun AcceleraBanner(
     LaunchedEffect(data) {
         isLoading = true
         val requestData = data?.toJsonBytes()
+        val dataWithUserInfo = Accelera.shared.addUserInfo(to = requestData)
         
-        Accelera.shared.getApi().loadBanner(requestData) { result, error ->
+        Accelera.shared.getApi().loadBanner(dataWithUserInfo) { result, error ->
             if (error != null) {
                 Accelera.shared.error("Failed to load content: ${error.message}")
                 isLoading = false

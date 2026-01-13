@@ -129,12 +129,20 @@ class Accelera private constructor() {
             if (eventName.isNotEmpty()) {
                 delegate?.action(eventName)
             }
-            log("Logging event: $jsonString")
         } catch (e: Exception) {
-            log("Logging event: <invalid UTF-8 data>")
+            // Ignore parsing errors for action
         }
 
         val dataWithUserInfo = addUserInfo(to = event)
+        
+        // Log final data that will be sent to API
+        try {
+            val finalJsonString = dataWithUserInfo?.let { String(it, Charsets.UTF_8) } ?: "null"
+            log("Logging event: $finalJsonString")
+        } catch (e: Exception) {
+            log("Logging event: <invalid UTF-8 data>")
+        }
+        
         getApi().logEvent(dataWithUserInfo) { result, error ->
             if (error != null) {
                 this@Accelera.error("Event error ${error.message}")
