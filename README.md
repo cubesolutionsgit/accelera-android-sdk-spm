@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.4.3")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.4.4")
 }
 ```
 
