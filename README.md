@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.4.4")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.4.5")
 }
 ```
 
@@ -237,7 +237,7 @@ Accelera.shared.setUserInfo(
 
 ---
 
-📄 Версия: `0.4.1`  
+📄 Версия: `0.4.5`  
 📆 Обновлено: октябрь 2025  
 📫 Поддержка: [@cubesolutions](https://github.com/cubesolutionsgit)  
 🔗 Репозиторий: [accelera-android-sdk-spm](https://github.com/cubesolutionsgit/accelera-android-sdk-spm)
