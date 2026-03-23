@@ -104,7 +104,6 @@ class StoryEntryPreloader(
         
         val entryCache = EntryCache(entryId, cards)
         
-        // Pre-create Div2View instances for all cards
         cards.forEachIndexed { index, card ->
             val divView = makeDivView()
             val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
@@ -113,6 +112,8 @@ class StoryEntryPreloader(
                 val tag = DivDataTag("story_${entryId}_$index")
                 divView.setData(divData, tag)
             }
+            // Pause immediately so autoplay videos don't produce audio while preloaded
+            DivKitSetup.pauseVideoPlayers(divView)
             entryCache.cardViews[index] = divView
         }
         
@@ -153,15 +154,11 @@ class StoryEntryPreloader(
     fun releaseEntry(entryId: String) {
         val entryCache = cache[entryId] ?: return
         
-        // Release all Div2View resources before removing from cache
         entryCache.cardViews.values.forEach { divView ->
             try {
-                // Cancel any animations
+                DivKitSetup.releaseVideoPlayers(divView)
                 divView.clearAnimation()
                 divView.animate()?.cancel()
-                
-                // Remove from parent if attached
-                // This will automatically trigger resource cleanup in Div2View
                 (divView.parent as? ViewGroup)?.removeView(divView)
             } catch (e: Exception) {
                 // Ignore errors during cleanup

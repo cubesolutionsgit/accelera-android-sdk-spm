@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import com.yandex.div.DivDataTag
+
 import com.yandex.div.core.view2.Div2View
 import org.json.JSONObject
 
@@ -63,9 +64,9 @@ class StoryCardContainerView @JvmOverloads constructor(
         this.jsonData = jsonData
         this.entryId = entryId
 
-        // Cleanup old cards properly before adding new ones
         cardViews.values.forEach { divView ->
             try {
+                DivKitSetup.releaseVideoPlayers(divView)
                 divView.clearAnimation()
                 divView.animate()?.cancel()
                 divView.setOnTouchListener(null)
@@ -119,9 +120,9 @@ class StoryCardContainerView @JvmOverloads constructor(
         this.jsonData = jsonData
         this.entryId = entryId
 
-        // Cleanup old cards properly before adding new ones
         cardViews.values.forEach { divView ->
             try {
+                DivKitSetup.releaseVideoPlayers(divView)
                 divView.clearAnimation()
                 divView.animate()?.cancel()
                 divView.setOnTouchListener(null)
@@ -132,11 +133,10 @@ class StoryCardContainerView @JvmOverloads constructor(
         cardViews.values.forEach { removeView(it) }
         cardViews.clear()
 
-        // Use cached views or create new ones
         cards.forEachIndexed { index, card ->
+            val isCached = cachedViews.containsKey(index)
             val divView = cachedViews[index] ?: DivKitSetup.makeView(context, jsonData)
 
-            // Remove from parent if it was in another container
             (divView.parent as? ViewGroup)?.removeView(divView)
 
             divView.layoutParams = LayoutParams(
@@ -144,22 +144,21 @@ class StoryCardContainerView @JvmOverloads constructor(
                 LayoutParams.MATCH_PARENT
             )
 
-            // Load card data
-            val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
-            val divData = DivKitSetup.parseDivData(cardBytes)
-            if (divData != null) {
-                val tag = DivDataTag("story_${entryId}_$index")
-                divView.setData(divData, tag)
+            // Only set data on newly created views; cached views already have data from preloading
+            if (!isCached) {
+                val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
+                val divData = DivKitSetup.parseDivData(cardBytes)
+                if (divData != null) {
+                    val tag = DivDataTag("story_${entryId}_$index")
+                    divView.setData(divData, tag)
+                }
             }
 
-            // Don't intercept touch events - let parent handle gestures
             divView.isClickable = false
             divView.isFocusable = false
             divView.isFocusableInTouchMode = false
-            // Set touch listener to prevent event interception
-            divView.setOnTouchListener { _, _ -> false }  // Don't consume events
+            divView.setOnTouchListener { _, _ -> false }
 
-            // Initially hidden
             divView.visibility = View.GONE
             divView.alpha = 0f
 
@@ -176,11 +175,10 @@ class StoryCardContainerView @JvmOverloads constructor(
 
         val targetView = cardViews[index] ?: return
 
-        // Hide current card and release its resources to free memory
         if (currentCardIndex >= 0 && currentCardIndex != index) {
             val currentView = cardViews[currentCardIndex]
             if (currentView != null) {
-                // Cancel any animations on the view being hidden
+                DivKitSetup.pauseVideoPlayers(currentView)
                 currentView.clearAnimation()
                 currentView.animate()?.cancel()
 
@@ -190,20 +188,15 @@ class StoryCardContainerView @JvmOverloads constructor(
                         .setDuration(200L)
                         .withEndAction {
                             currentView.visibility = View.GONE
-                            // Clear touch listener to release references
-                            currentView.setOnTouchListener(null)
                         }
                         .start()
                 } else {
                     currentView.visibility = View.GONE
                     currentView.alpha = 0f
-                    // Clear touch listener immediately
-                    currentView.setOnTouchListener(null)
                 }
             }
         }
 
-        // Show target card
         targetView.visibility = View.VISIBLE
         if (animate && currentCardIndex >= 0) {
             targetView.alpha = 0f
@@ -215,6 +208,7 @@ class StoryCardContainerView @JvmOverloads constructor(
             targetView.alpha = 1f
         }
 
+        DivKitSetup.restartVideoPlayers(targetView)
         currentCardIndex = index
     }
 
@@ -234,20 +228,43 @@ class StoryCardContainerView @JvmOverloads constructor(
     fun getCardView(index: Int): Div2View? = cardViews[index]
 
     /**
+     * Pauses all video/audio playback in this container.
+     * Players stay alive and can be resumed.
+     */
+    fun pauseVideoPlayers() {
+        cardViews.values.forEach { divView ->
+            try {
+                DivKitSetup.pauseVideoPlayers(divView)
+            } catch (e: Exception) {
+                // Ignore errors
+            }
+        }
+    }
+
+    /**
+     * Permanently releases all ExoPlayer instances in this container.
+     * Use only when the container is being discarded.
+     */
+    fun releaseVideoPlayers() {
+        cardViews.values.forEach { divView ->
+            try {
+                DivKitSetup.releaseVideoPlayers(divView)
+            } catch (e: Exception) {
+                // Ignore errors
+            }
+        }
+    }
+
+    /**
      * Cleans up resources.
      */
     fun cleanup() {
-        // Cancel all animations and release Div2View resources before removing
         cardViews.values.forEach { divView ->
             try {
-                // Cancel any running animations
+                DivKitSetup.releaseVideoPlayers(divView)
                 divView.clearAnimation()
                 divView.animate()?.cancel()
-
-                // Clear touch listeners
                 divView.setOnTouchListener(null)
-
-                // Div2View will automatically release media resources when removed from parent
             } catch (e: Exception) {
                 // Ignore errors during cleanup
             }

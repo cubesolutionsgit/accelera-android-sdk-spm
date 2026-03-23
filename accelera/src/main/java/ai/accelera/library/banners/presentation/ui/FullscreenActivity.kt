@@ -288,6 +288,10 @@ class FullscreenActivity : AppCompatActivity() {
 
         progressManager.stopProgress()
 
+        if (!isInitialLoad) {
+            containerManager.getCurrentContainer()?.pauseVideoPlayers()
+        }
+
         when (val result = entryLoader.loadEntry(id, viewState, isInitialLoad)) {
             is StoryEntryLoader.LoadResult.Success -> {
                 viewState = result.viewState
@@ -420,6 +424,8 @@ class FullscreenActivity : AppCompatActivity() {
             transitionManager.startTransition()
             progressManager.stopProgress()
 
+            containerManager.getCurrentContainer()?.pauseVideoPlayers()
+
             // Ensure entry is preloaded
             if (!entryPreloader.isCached(entryId)) {
                 entryPreloader.preloadAdjacentEntries(
@@ -505,10 +511,11 @@ class FullscreenActivity : AppCompatActivity() {
     }
 
     private fun closeStories() {
-        // Protection: don't close if transitioning (prevents accidental closes during rapid swipes)
         if (transitionManager.isTransitioning()) {
             return
         }
+
+        containerManager.getCurrentContainer()?.pauseVideoPlayers()
 
         entryAnimator.animateClose(rootLayout) {
             finish()
@@ -519,11 +526,17 @@ class FullscreenActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         progressManager.pauseProgress()
+        containerManager.getCurrentContainer()?.pauseVideoPlayers()
     }
 
     override fun onResume() {
         super.onResume()
         progressManager.resumeProgress()
+        val container = containerManager.getCurrentContainer() ?: return
+        val cardView = container.getCardView(viewState.currentCardIndex)
+        if (cardView != null) {
+            DivKitSetup.restartVideoPlayers(cardView)
+        }
     }
 
     override fun onDestroy() {
