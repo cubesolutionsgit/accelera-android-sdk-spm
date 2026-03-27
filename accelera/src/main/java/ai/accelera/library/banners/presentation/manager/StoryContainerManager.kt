@@ -20,41 +20,30 @@ class StoryContainerManager(
 
     /**
      * Gets or creates a container for the specified entry ID.
-     * 
-     * @param entryId The entry ID to get container for
-     * @param currentEntryId The currently active entry ID (to reuse its container)
-     * @return The container for the entry
+     *
+     * Each entry ID maps to its own container instance.
      */
-    fun getOrCreateContainer(
-        entryId: String,
-        currentEntryId: String
-    ): StoryCardContainerView {
+    fun getOrCreateContainer(entryId: String): StoryCardContainerView {
         // Check if container already exists
         entryContainers[entryId]?.let { return it }
-        
-        // Create or reuse container
-        val container = if (entryId == currentEntryId && currentCardContainer != null) {
-            // Reuse current container
-            currentCardContainer!!
-        } else {
-            // Create new container for preloaded entry
-            StoryCardContainerView(context).apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                )
-                visibility = View.GONE
-                // Ensure it doesn't intercept touch events
-                isClickable = false
-                isFocusable = false
-                isFocusableInTouchMode = false
-                rootLayout.addView(this)
-            }
+
+        // Create new container for entry
+        val container = StoryCardContainerView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            visibility = View.GONE
+            // Ensure it doesn't intercept touch events
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            rootLayout.addView(this)
         }
-        
+
         // Add to containers map
         entryContainers[entryId] = container
-        
+
         return container
     }
 

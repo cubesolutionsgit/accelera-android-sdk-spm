@@ -92,7 +92,7 @@ class StoryEntryLoader(
         currentEntryId: String
     ) {
         // Get or create container for this entry
-        val container = containerManager.getOrCreateContainer(entryId, currentEntryId)
+        val container = containerManager.getOrCreateContainer(entryId)
 
         // Setup cards using cached views if available
         val cachedViews = entryPreloader.getCachedCardViews(entryId)

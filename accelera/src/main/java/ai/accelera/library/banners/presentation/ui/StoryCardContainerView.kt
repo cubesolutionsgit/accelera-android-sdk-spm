@@ -66,15 +66,16 @@ class StoryCardContainerView @JvmOverloads constructor(
 
         cardViews.values.forEach { divView ->
             try {
-                DivKitSetup.releaseVideoPlayers(divView)
+                // Temporary deactivation: keep players alive for possible reuse.
+                DivKitSetup.pauseVideoPlayers(divView)
                 divView.clearAnimation()
                 divView.animate()?.cancel()
                 divView.setOnTouchListener(null)
+                (divView.parent as? ViewGroup)?.removeView(divView)
             } catch (e: Exception) {
                 // Ignore errors
             }
         }
-        cardViews.values.forEach { removeView(it) }
         cardViews.clear()
 
         // Create and add all card views (initially hidden)
@@ -92,6 +93,8 @@ class StoryCardContainerView @JvmOverloads constructor(
                 val tag = DivDataTag("story_${entryId}_$index")
                 divView.setData(divData, tag)
             }
+            // Prevent hidden pre-created cards from playing audio before activation.
+            DivKitSetup.pauseVideoPlayers(divView)
 
             // Don't intercept touch events - let parent handle gestures
             divView.isClickable = false
@@ -122,15 +125,16 @@ class StoryCardContainerView @JvmOverloads constructor(
 
         cardViews.values.forEach { divView ->
             try {
-                DivKitSetup.releaseVideoPlayers(divView)
+                // Temporary deactivation: keep players alive for possible reuse.
+                DivKitSetup.pauseVideoPlayers(divView)
                 divView.clearAnimation()
                 divView.animate()?.cancel()
                 divView.setOnTouchListener(null)
+                (divView.parent as? ViewGroup)?.removeView(divView)
             } catch (e: Exception) {
                 // Ignore errors
             }
         }
-        cardViews.values.forEach { removeView(it) }
         cardViews.clear()
 
         cards.forEachIndexed { index, card ->
@@ -153,6 +157,8 @@ class StoryCardContainerView @JvmOverloads constructor(
                     divView.setData(divData, tag)
                 }
             }
+            // Keep hidden cards silent until explicitly activated.
+            DivKitSetup.pauseVideoPlayers(divView)
 
             divView.isClickable = false
             divView.isFocusable = false
@@ -170,7 +176,7 @@ class StoryCardContainerView @JvmOverloads constructor(
     /**
      * Shows a specific card with optional animation.
      */
-    fun showCard(index: Int, animate: Boolean = true) {
+    fun showCard(index: Int, animate: Boolean = true, restartPlayback: Boolean = true) {
         if (index < 0 || index >= cardViews.size) return
 
         val targetView = cardViews[index] ?: return
@@ -208,7 +214,11 @@ class StoryCardContainerView @JvmOverloads constructor(
             targetView.alpha = 1f
         }
 
-        DivKitSetup.restartVideoPlayers(targetView)
+        if (restartPlayback) {
+            DivKitSetup.restartVideoPlayers(targetView)
+        } else {
+            DivKitSetup.playVideoPlayers(targetView)
+        }
         currentCardIndex = index
     }
 
