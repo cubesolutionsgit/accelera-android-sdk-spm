@@ -1,8 +1,8 @@
 package ai.accelera.library.banners.infrastructure.logging
 
 import ai.accelera.library.Accelera
+import ai.accelera.library.banners.domain.logging.StoryAnalytics
 import ai.accelera.library.utils.toJsonBytes
-import ai.accelera.library.banners.data.repository.StoryDataRepository
 import org.json.JSONObject
 
 /**
@@ -12,7 +12,7 @@ import org.json.JSONObject
  * Follows Single Responsibility Principle - only handles event logging.
  */
 class StoryEventLogger(
-    private val dataRepository: StoryDataRepository
+    private val analytics: StoryAnalytics = AcceleraStoryAnalytics()
 ) {
     /**
      * Logs a view event for a specific card.
@@ -21,15 +21,25 @@ class StoryEventLogger(
      */
     fun logCardView(card: JSONObject) {
         try {
-            val meta = dataRepository.getCardMeta(card)
-            val eventPayload = mapOf(
-                "event" to "view",
-                "meta" to meta.toString()
-            )
-            Accelera.shared.logEvent(eventPayload.toJsonBytes())
+            val meta = card.optJSONObject("card")?.optJSONObject("meta") ?: JSONObject()
+            analytics.logCardView(meta)
         } catch (e: Exception) {
-            Accelera.shared.error("Error logging view event: ${e.message}")
+            analytics.logError("Error logging view event: ${e.message}")
         }
+    }
+}
+
+class AcceleraStoryAnalytics : StoryAnalytics {
+    override fun logCardView(meta: JSONObject) {
+        val eventPayload = mapOf(
+            "event" to "view",
+            "meta" to meta.toString()
+        )
+        Accelera.shared.logEvent(eventPayload.toJsonBytes())
+    }
+
+    override fun logError(message: String) {
+        Accelera.shared.error(message)
     }
 }
 

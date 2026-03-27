@@ -13,14 +13,25 @@ enum class PlaybackState {
     Destroyed
 }
 
+fun interface StoriesStateLogger {
+    fun log(message: String)
+}
+
 class PlaybackStateMachine {
+    constructor() : this(StoriesStateLogger { Accelera.shared.log(it) })
+    constructor(logger: StoriesStateLogger) {
+        this.logger = logger
+    }
+
+    private val logger: StoriesStateLogger
+
     var state: PlaybackState = PlaybackState.Idle
         private set
 
     fun onEvent(event: PlaybackEvent): Boolean {
         val next = nextState(state, event) ?: return false
         if (next != state) {
-            Accelera.shared.log("Stories state: $state -> $event -> $next")
+            logger.log("Stories state: $state -> $event -> $next")
         }
         state = next
         return true
@@ -28,7 +39,7 @@ class PlaybackStateMachine {
 
     fun forceState(newState: PlaybackState) {
         if (state != newState) {
-            Accelera.shared.log("Stories state force: $state -> $newState")
+            logger.log("Stories state force: $state -> $newState")
             state = newState
         }
     }

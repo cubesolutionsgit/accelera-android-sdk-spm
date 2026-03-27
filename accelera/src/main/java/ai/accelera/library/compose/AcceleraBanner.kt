@@ -1,21 +1,16 @@
 package ai.accelera.library.compose
 
 import ai.accelera.library.Accelera
-import ai.accelera.library.banners.AcceleraBanners
-import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
+import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
 import ai.accelera.library.banners.presentation.ui.CloseButton
 import ai.accelera.library.utils.closable
-import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.toJsonBytes
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.yandex.div.core.view2.Div2View
-import org.json.JSONObject
 
 /**
  * Composable for displaying Accelera banner content.
@@ -28,16 +23,14 @@ fun AcceleraBanner(
     data: Map<String, Any?>? = null,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     var jsonData by remember { mutableStateOf<ByteArray?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    val loadBannerContentUseCase = remember { DefaultLoadBannerContentUseCase() }
 
     LaunchedEffect(data) {
         isLoading = true
         val requestData = data?.toJsonBytes()
-        val dataWithUserInfo = Accelera.shared.addUserInfo(to = requestData)
-        
-        Accelera.shared.getApi().loadBanner(dataWithUserInfo) { result, error ->
+        loadBannerContentUseCase.load(requestData) { result, error ->
             if (error != null) {
                 Accelera.shared.error("Failed to load content: ${error.message}")
                 isLoading = false
@@ -45,14 +38,6 @@ fun AcceleraBanner(
                 val loadedData = result
                 if (loadedData != null) {
                     jsonData = loadedData
-                    
-                    // Log view event (using extension property like iOS)
-                    val metaValue = loadedData.meta
-                    val eventPayload = mapOf(
-                        "event" to "view",
-                        "meta" to (metaValue ?: emptyMap<String, Any?>())
-                    )
-                    Accelera.shared.logEvent(eventPayload.toJsonBytes())
                 }
                 isLoading = false
             }

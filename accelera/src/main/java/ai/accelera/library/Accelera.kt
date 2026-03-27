@@ -1,18 +1,17 @@
 package ai.accelera.library
 
-import ai.accelera.library.api.AcceleraAPI
 import ai.accelera.library.api.AcceleraAPIProtocol
-import ai.accelera.library.api.AcceleraAPIStub
-import ai.accelera.library.utils.mergeJSON
-import ai.accelera.library.utils.toJsonBytes
+import ai.accelera.library.core.api.DefaultApiProvider
+import ai.accelera.library.core.di.InternalModule
 import kotlinx.serialization.json.Json
-import org.json.JSONObject
 
 /**
  * Main library class for Accelera SDK.
  * Provides singleton access via [shared] instance.
  */
 class Accelera private constructor() {
+    private val internalModule = InternalModule()
+    private val apiProvider = DefaultApiProvider { message -> error(message) }
     
     companion object {
         /**
@@ -21,12 +20,6 @@ class Accelera private constructor() {
         @JvmStatic
         val shared: Accelera = Accelera()
     }
-
-    @Volatile
-    private var config: AcceleraConfig? = null
-
-    private val logBuffer = mutableListOf<String>()
-    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     @Volatile
     private var delegate: AcceleraDelegate? = null
@@ -48,31 +41,7 @@ class Accelera private constructor() {
      */
     fun setDelegate(newDelegate: AcceleraDelegate?) {
         delegate = newDelegate
-        pushBufferedLogs(newDelegate)
-    }
-
-    private fun pushBufferedLogs(currentDelegate: AcceleraDelegate?) {
-        if (currentDelegate != null) {
-            val messages: List<String>
-            synchronized(logBuffer) {
-                messages = if (logBuffer.isNotEmpty()) {
-                    ArrayList(logBuffer).also { logBuffer.clear() }
-                } else {
-                    emptyList()
-                }
-            }
-            if (messages.isNotEmpty()) {
-                mainHandler.post {
-                    messages.forEach { msg ->
-                        currentDelegate.log(msg)
-                    }
-                }
-            }
-        } else {
-            synchronized(logBuffer) {
-                logBuffer.clear()
-            }
-        }
+        internalModule.logger.setDelegate(newDelegate)
     }
 
     /**
@@ -82,7 +51,7 @@ class Accelera private constructor() {
      */
     fun configure(config: AcceleraConfig) {
         synchronized(this) {
-            this.config = config
+            internalModule.configStore.setConfig(config)
             this.api = null // Reset API to force recreation
         }
         
@@ -102,18 +71,11 @@ class Accelera private constructor() {
      * @param userInfo JSON string with user information
      */
     fun setUserInfo(userInfo: String?) {
-        val currentConfig = synchronized(this) { config } ?: run {
+        val updatedConfig = internalModule.configStore.updateUserInfo(userInfo) ?: run {
             error("Can't set userInfo — Accelera is not configured!")
             return
         }
-
-        val mergedUserInfo = mergeJSON(currentConfig.userInfo, userInfo) ?: userInfo
-        
-        synchronized(this) {
-            this.config = currentConfig.copy(userInfo = mergedUserInfo)
-        }
-
-        log("User info set to: ${this.config?.userInfo ?: "nil"}")
+        log("User info set to: ${updatedConfig.userInfo ?: "nil"}")
     }
 
     /**
@@ -122,16 +84,7 @@ class Accelera private constructor() {
      * @param event Event data as JSON bytes
      */
     fun logEvent(event: ByteArray) {
-        try {
-            val jsonString = String(event, Charsets.UTF_8)
-            val jsonObject = JSONObject(jsonString)
-            val eventName = jsonObject.optString("event")
-            if (eventName.isNotEmpty()) {
-                delegate?.action(eventName)
-            }
-        } catch (e: Exception) {
-            // Ignore parsing errors for action
-        }
+        internalModule.eventActionExtractor.extract(event)?.let { delegate?.action(it) }
 
         val dataWithUserInfo = addUserInfo(to = event)
         
@@ -154,18 +107,12 @@ class Accelera private constructor() {
 
     internal fun log(message: Any) {
         val msg = "[Accelera] $message"
-        synchronized(logBuffer) {
-            logBuffer.add(msg)
-        }
-        delegate?.log(msg)
+        internalModule.logger.log(msg)
     }
 
     internal fun error(error: Any) {
         val msg = "[Accelera] Error: $error"
-        synchronized(logBuffer) {
-            logBuffer.add(msg)
-        }
-        delegate?.error(msg)
+        internalModule.logger.error(msg)
     }
 
     internal fun handleUrl(url: android.net.Uri) {
@@ -180,55 +127,13 @@ class Accelera private constructor() {
     }
     
     internal fun addUserInfo(to: ByteArray?): ByteArray? {
-        val payload = mutableMapOf<String, Any?>()
-
-        if (to != null) {
-            try {
-                val jsonString = String(to, Charsets.UTF_8)
-                val dict = JSONObject(jsonString)
-                val keys = dict.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    payload[key] = dict.get(key)
-                }
-            } catch (e: Exception) {
-                // Ignore parsing errors
-            }
-        }
-
-        val userInfo = config?.userInfo
-        if (userInfo != null) {
-            try {
-                val infoData = JSONObject(userInfo)
-                payload["userInfo"] = infoData
-            } catch (e: Exception) {
-                // Ignore parsing errors
-            }
-        }
-
-        return payload.toJsonBytes()
+        val userInfo = internalModule.configStore.getConfig()?.userInfo
+        return internalModule.payloadMerger.mergeUserInfo(payload = to, userInfo = userInfo)
     }
 
     private fun createApi(): AcceleraAPIProtocol {
-        val customAPI = delegate?.customAPI
-        if (customAPI != null) {
-            return customAPI
-        }
-
-        val currentConfig = config
-        if (currentConfig != null && currentConfig.url != null) {
-            return AcceleraAPI(currentConfig)
-        }
-
-        error(
-            """
-            API initialization failed.
-            Missing configuration and no custom API provided by delegate.
-            Set AcceleraConfig via configure(...) or implement AcceleraDelegate.customAPI.
-            """.trimIndent()
-        )
-
-        return AcceleraAPIStub()
+        val currentConfig = internalModule.configStore.getConfig()
+        return apiProvider.provide(config = currentConfig, delegate = delegate)
     }
 
 

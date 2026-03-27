@@ -1,16 +1,10 @@
 package ai.accelera.library.banners.presentation.playback
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import ai.accelera.library.banners.data.repository.StoryDataRepository
 import ai.accelera.library.banners.domain.model.StoryViewState
-import ai.accelera.library.banners.infrastructure.animation.StoryEntryAnimator
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
-import ai.accelera.library.banners.infrastructure.logging.StoryEventLogger
-import ai.accelera.library.banners.presentation.manager.StoryProgressManager
 import ai.accelera.library.banners.presentation.ui.StoryCardContainerView
 import androidx.lifecycle.LifecycleOwner
 
@@ -24,33 +18,27 @@ class StoryPlaybackCoordinator(
     private val jsonData: ByteArray,
     private val lifecycleOwner: LifecycleOwner,
     private val onCloseRequested: () -> Unit,
+    dependencies: StoryPlaybackDependencies? = null
 ) {
-    private val handler = Handler(Looper.getMainLooper())
-
-    private val dataRepository = StoryDataRepository(jsonData)
-    private val eventLogger = StoryEventLogger(dataRepository)
-    private val stateMachine = PlaybackStateMachine()
-    private val navigator = StoryNavigator()
-    private val repository = EntryViewRepository(context, rootLayout)
-    private val playerController = PlayerLifecycleController(repository)
-    private val entryAnimator = StoryEntryAnimator(rootLayout)
-    private val loadEntryUseCase: LoadEntryUseCase = DefaultLoadEntryUseCase(dataRepository)
-    private val prepareFirstVideoUseCase: PrepareFirstVideoUseCase = DefaultPrepareFirstVideoUseCase(
-        repository = repository,
-        jsonData = jsonData,
-        makeDivView = { DivKitSetup.makeView(context, jsonData, lifecycleOwner) }
-    )
-    private val preloadAdjacentEntriesUseCase: PreloadAdjacentEntriesUseCase =
-        DefaultPreloadAdjacentEntriesUseCase(
-            handler = handler,
-            dataRepository = dataRepository,
-            prepareFirstVideoUseCase = prepareFirstVideoUseCase
-        )
-    private val progressManager = StoryProgressManager(
+    private val deps = dependencies ?: StoryPlaybackDependencyFactory.create(
         context = context,
+        rootLayout = rootLayout,
         progressContainer = progressContainer,
+        jsonData = jsonData,
+        lifecycleOwner = lifecycleOwner,
         onProgressComplete = { handleEvent(PlaybackEvent.TapNext) }
     )
+    private val handler = deps.handler
+    private val dataRepository = deps.dataSource
+    private val eventLogger = deps.eventLogger
+    private val stateMachine = deps.stateMachine
+    private val navigator = deps.navigator
+    private val repository = deps.repository
+    private val playerController = deps.playerController
+    private val entryAnimator = deps.entryAnimator
+    private val loadEntryUseCase = deps.loadEntryUseCase
+    private val preloadAdjacentEntriesUseCase = deps.preloadAdjacentEntriesUseCase
+    private val progressManager = deps.progressManager
 
     private var viewState = StoryViewState()
 

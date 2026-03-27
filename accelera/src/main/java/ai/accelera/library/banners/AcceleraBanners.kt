@@ -2,20 +2,17 @@ package ai.accelera.library.banners
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.utils.closable
-import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.parentActivity
-import ai.accelera.library.utils.toJsonBytes
+import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.CloseButton
 import android.view.ViewGroup
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 /**
  * Extension functions for Accelera banners module (similar to Accelera+Banners in iOS).
  */
 object AcceleraBanners {
+    private val loadBannerContentUseCase = DefaultLoadBannerContentUseCase()
 
     /**
      * Loads and attaches dynamic content into the given container.
@@ -46,8 +43,7 @@ object AcceleraBanners {
         val paramsString = data?.let { String(it, Charsets.UTF_8) } ?: "<invalid>"
         Accelera.shared.log("Loading content with params: $paramsString")
 
-        val dataWithUserInfo = Accelera.shared.addUserInfo(to = data)
-        Accelera.shared.getApi().loadBanner(dataWithUserInfo) { result, error ->
+        loadBannerContentUseCase.load(data) { result, error ->
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 if (error != null) {
                     Accelera.shared.error("Failed to load content: ${error}")
@@ -82,14 +78,6 @@ object AcceleraBanners {
                         val tag = com.yandex.div.DivDataTag("accelera_${System.currentTimeMillis()}")
                         divView.setData(divData, tag)
                     }
-
-                    // Log view event (similar to iOS: self.logEvent(event: ["event": "view", "meta": jsonData.meta].asData))
-                    val metaValue = jsonData.meta
-                    val eventPayload = mapOf(
-                        "event" to "view",
-                        "meta" to (metaValue ?: emptyMap<String, Any?>())
-                    )
-                    Accelera.shared.logEvent(eventPayload.toJsonBytes())
 
                     // Add close button if closable (similar to iOS: if jsonData.closable == true)
                     if (jsonData.closable == true) {

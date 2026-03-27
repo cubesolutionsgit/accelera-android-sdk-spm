@@ -2,7 +2,7 @@ package ai.accelera.library.banners.presentation.playback
 
 import android.os.Handler
 import ai.accelera.library.Accelera
-import ai.accelera.library.banners.data.repository.StoryDataRepository
+import ai.accelera.library.banners.domain.repository.StoryDataSource
 import org.json.JSONObject
 
 /**
@@ -40,7 +40,7 @@ interface PreloadAdjacentEntriesUseCase {
  * Default entry loading implementation backed by [StoryDataRepository].
  */
 class DefaultLoadEntryUseCase(
-    private val dataRepository: StoryDataRepository
+    private val dataRepository: StoryDataSource
 ) : LoadEntryUseCase {
     override fun load(entryId: String, entryIds: List<String>): LoadedEntry? {
         val cards = dataRepository.loadEntryCards(entryId) ?: return null
@@ -72,7 +72,7 @@ class DefaultPrepareFirstVideoUseCase(
  */
 class DefaultPreloadAdjacentEntriesUseCase(
     private val handler: Handler,
-    private val dataRepository: StoryDataRepository,
+    private val dataRepository: StoryDataSource,
     private val prepareFirstVideoUseCase: PrepareFirstVideoUseCase
 ) : PreloadAdjacentEntriesUseCase {
     private val queuedEntryIds = mutableSetOf<String>()

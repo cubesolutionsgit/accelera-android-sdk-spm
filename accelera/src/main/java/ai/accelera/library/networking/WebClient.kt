@@ -17,7 +17,7 @@ enum class RequestMethod {
 /**
  * A simple HTTP client for sending JSON-based API requests.
  */
-class WebClient(private val baseUrl: String) {
+class WebClient(private val baseUrl: String) : HttpClient {
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -104,6 +104,16 @@ class WebClient(private val baseUrl: String) {
         })
 
         return call
+    }
+
+    override fun execute(
+        path: String,
+        method: RequestMethod,
+        body: ByteArray?,
+        headers: Map<String, String>,
+        completion: (ByteArray?, NetworkError?) -> Unit
+    ) {
+        load(path = path, method = method, body = body, headers = headers, completion = completion)
     }
 }
 

@@ -1,17 +1,18 @@
 package ai.accelera.library.banners.data.repository
 
 import ai.accelera.library.Accelera
+import ai.accelera.library.banners.domain.repository.StoryDataSource
 import org.json.JSONObject
 
 /**
  * Repository for managing story data parsing and extraction.
  */
-class StoryDataRepository(private val jsonData: ByteArray) {
+class StoryDataRepository(private val jsonData: ByteArray) : StoryDataSource {
 
     /**
      * Loads all entry IDs from the JSON data.
      */
-    fun loadEntryIds(): List<String> {
+    override fun loadEntryIds(): List<String> {
         return try {
             val jsonString = String(jsonData, Charsets.UTF_8)
             val root = JSONObject(jsonString)
@@ -30,7 +31,7 @@ class StoryDataRepository(private val jsonData: ByteArray) {
     /**
      * Loads cards for a specific entry ID.
      */
-    fun loadEntryCards(entryId: String): List<JSONObject>? {
+    override fun loadEntryCards(entryId: String): List<JSONObject>? {
         return try {
             val jsonString = String(jsonData, Charsets.UTF_8)
             val root = JSONObject(jsonString)
@@ -52,7 +53,7 @@ class StoryDataRepository(private val jsonData: ByteArray) {
     /**
      * Extracts duration from a card JSON object.
      */
-    fun getCardDuration(card: JSONObject): Long {
+    override fun getCardDuration(card: JSONObject): Long {
         val cardObj = card.optJSONObject("card")
         val duration = cardObj?.optInt("duration") ?: card.optInt("duration", 0)
         return if (duration > 0) duration.toLong() else 5000L // Default 5 seconds
@@ -61,7 +62,7 @@ class StoryDataRepository(private val jsonData: ByteArray) {
     /**
      * Checks if a card has a duration.
      */
-    fun hasDuration(card: JSONObject): Boolean {
+    override fun hasDuration(card: JSONObject): Boolean {
         val cardObj = card.optJSONObject("card")
         val duration = cardObj?.optInt("duration") ?: card.optInt("duration")
         return duration > 0
@@ -70,7 +71,7 @@ class StoryDataRepository(private val jsonData: ByteArray) {
     /**
      * Extracts meta information from a card for logging.
      */
-    fun getCardMeta(card: JSONObject): JSONObject {
+    override fun getCardMeta(card: JSONObject): JSONObject {
         return card.optJSONObject("card")?.optJSONObject("meta") ?: JSONObject()
     }
 }
