@@ -84,7 +84,13 @@ class Accelera private constructor() {
      * @param event Event data as JSON bytes
      */
     fun logEvent(event: ByteArray) {
-        internalModule.eventActionExtractor.extract(event)?.let { delegate?.action(it) }
+        internalModule.eventActionPayloadExtractor.extract(event)?.let { payload ->
+            delegate?.action(
+                actionName = payload.actionName,
+                params = payload.params,
+                meta = payload.meta
+            )
+        }
 
         val dataWithUserInfo = addUserInfo(to = event)
         

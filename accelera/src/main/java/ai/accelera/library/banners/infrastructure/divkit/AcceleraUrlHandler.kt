@@ -97,9 +97,7 @@ internal class AcceleraUrlHandler(
                 }
             }
 
-            else -> {
-                Accelera.Companion.shared.error("Unknown div-action type: $actionType")
-            }
+            else -> Unit
         }
         return false
     }
