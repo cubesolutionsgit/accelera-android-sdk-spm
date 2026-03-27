@@ -5,7 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import ai.accelera.library.Accelera
 import ai.accelera.library.banners.data.repository.StoryDataRepository
 import ai.accelera.library.banners.domain.model.StoryViewState
 import ai.accelera.library.banners.infrastructure.animation.StoryEntryAnimator
@@ -14,8 +13,10 @@ import ai.accelera.library.banners.infrastructure.logging.StoryEventLogger
 import ai.accelera.library.banners.presentation.manager.StoryProgressManager
 import ai.accelera.library.banners.presentation.ui.StoryCardContainerView
 import androidx.lifecycle.LifecycleOwner
-import org.json.JSONObject
 
+/**
+ * Orchestrates story playback lifecycle, navigation and preload pipeline.
+ */
 class StoryPlaybackCoordinator(
     private val context: Context,
     private val rootLayout: FrameLayout,
@@ -33,6 +34,18 @@ class StoryPlaybackCoordinator(
     private val repository = EntryViewRepository(context, rootLayout)
     private val playerController = PlayerLifecycleController(repository)
     private val entryAnimator = StoryEntryAnimator(rootLayout)
+    private val loadEntryUseCase: LoadEntryUseCase = DefaultLoadEntryUseCase(dataRepository)
+    private val prepareFirstVideoUseCase: PrepareFirstVideoUseCase = DefaultPrepareFirstVideoUseCase(
+        repository = repository,
+        jsonData = jsonData,
+        makeDivView = { DivKitSetup.makeView(context, jsonData, lifecycleOwner) }
+    )
+    private val preloadAdjacentEntriesUseCase: PreloadAdjacentEntriesUseCase =
+        DefaultPreloadAdjacentEntriesUseCase(
+            handler = handler,
+            dataRepository = dataRepository,
+            prepareFirstVideoUseCase = prepareFirstVideoUseCase
+        )
     private val progressManager = StoryProgressManager(
         context = context,
         progressContainer = progressContainer,
@@ -41,6 +54,9 @@ class StoryPlaybackCoordinator(
 
     private var viewState = StoryViewState()
 
+    /**
+     * Opens playback at the provided entry.
+     */
     fun open(entryId: String): Boolean {
         if (!stateMachine.onEvent(PlaybackEvent.Open(entryId))) return false
         val entryIds = dataRepository.loadEntryIds()
@@ -52,9 +68,16 @@ class StoryPlaybackCoordinator(
             currentEntryIndex = index,
             currentEntryId = resolvedEntryId
         )
-        return prepareAndShowEntry(resolvedEntryId, animate = false, isPrev = false)
+        val opened = prepareAndShowEntry(resolvedEntryId, animate = false, isPrev = false)
+        if (opened) {
+            scheduleAdjacentPreload()
+        }
+        return opened
     }
 
+    /**
+     * Handles external and UI playback events.
+     */
     fun handleEvent(event: PlaybackEvent) {
         when (event) {
             PlaybackEvent.TapNext -> processMove(navigator.nextByTap(viewState))
@@ -110,6 +133,7 @@ class StoryPlaybackCoordinator(
                 progressManager.cleanup()
                 playerController.releaseAll()
                 entryAnimator.reset()
+                preloadAdjacentEntriesUseCase.clear()
                 repository.cleanupAll()
                 handler.removeCallbacksAndMessages(null)
             }
@@ -154,54 +178,50 @@ class StoryPlaybackCoordinator(
             stateMachine.forceState(PlaybackState.ShowingCard)
             return
         }
-        val targetContainer = loaded.container
+        val loadedEntry = loaded.first
+        val targetContainer = loaded.second
 
         if (currentContainer === targetContainer) {
-            onEntryTransitionComplete(loaded.entryId, targetContainer)
+            onEntryTransitionComplete(loadedEntry.entryId, targetContainer)
             return
         }
 
         val runAnimation = if (isPrev) entryAnimator::animateToPrevEntry else entryAnimator::animateToNextEntry
         runAnimation(currentContainer, targetContainer) {
-            onEntryTransitionComplete(loaded.entryId, targetContainer)
+            onEntryTransitionComplete(loadedEntry.entryId, targetContainer)
         }
     }
 
-    private data class PreparedEntry(
-        val entryId: String,
-        val cards: List<JSONObject>,
-        val entryIndex: Int,
-        val container: StoryCardContainerView
-    )
-
-    private fun prepareEntry(entryId: String): PreparedEntry? {
+    private fun prepareEntry(entryId: String): Pair<LoadedEntry, StoryCardContainerView>? {
         stateMachine.forceState(PlaybackState.PreparingEntry)
-        val cards = dataRepository.loadEntryCards(entryId) ?: return null
-        val entryIndex = viewState.entryIds.indexOf(entryId).takeIf { it >= 0 } ?: return null
+        val loadedEntry = loadEntryUseCase.load(entryId, viewState.entryIds) ?: return null
         val container = repository.setupEntry(
-            entryId = entryId,
-            cards = cards,
+            entryId = loadedEntry.entryId,
+            cards = loadedEntry.cards,
             jsonData = jsonData,
             makeDivView = { DivKitSetup.makeView(context, jsonData, lifecycleOwner) }
         )
-        return PreparedEntry(entryId, cards, entryIndex, container)
+        return loadedEntry to container
     }
 
     private fun prepareAndShowEntry(entryId: String, animate: Boolean, isPrev: Boolean): Boolean {
         val prepared = prepareEntry(entryId) ?: return false
-        repository.setCurrentEntry(prepared.entryId)
+        val loadedEntry = prepared.first
+        val container = prepared.second
+        repository.setCurrentEntry(loadedEntry.entryId)
         viewState = viewState.copy(
-            currentEntryId = prepared.entryId,
-            currentEntryIndex = prepared.entryIndex,
-            currentCards = prepared.cards,
+            currentEntryId = loadedEntry.entryId,
+            currentEntryIndex = loadedEntry.entryIndex,
+            currentCards = loadedEntry.cards,
             currentCardIndex = 0
         )
-        prepared.container.visibility = android.view.View.VISIBLE
-        prepared.container.showCard(0, animate)
-        playerController.prepareVisibleCard(prepared.entryId, 0)
-        playerController.activateVisibleCard(prepared.entryId, 0)
+        container.visibility = android.view.View.VISIBLE
+        container.showCard(0, animate)
+        playerController.prepareVisibleCard(loadedEntry.entryId, 0)
+        playerController.activateVisibleCard(loadedEntry.entryId, 0)
         startProgressAndLog(0)
         repository.cleanupToAdjacent(viewState.entryIds, viewState.currentEntryIndex)
+        scheduleAdjacentPreload()
         stateMachine.forceState(if (animate) PlaybackState.TransitioningEntry else PlaybackState.ShowingCard)
         if (animate) {
             transitionToEntry(entryId, isPrev)
@@ -213,8 +233,9 @@ class StoryPlaybackCoordinator(
 
     private fun onEntryTransitionComplete(entryId: String, targetContainer: StoryCardContainerView) {
         repository.setCurrentEntry(entryId)
-        val cards = dataRepository.loadEntryCards(entryId) ?: emptyList()
-        val entryIndex = viewState.entryIds.indexOf(entryId).coerceAtLeast(0)
+        val loadedEntry = loadEntryUseCase.load(entryId, viewState.entryIds)
+        val cards = loadedEntry?.cards ?: emptyList()
+        val entryIndex = loadedEntry?.entryIndex ?: viewState.entryIds.indexOf(entryId).coerceAtLeast(0)
         viewState = viewState.copy(
             currentEntryId = entryId,
             currentEntryIndex = entryIndex,
@@ -227,6 +248,7 @@ class StoryPlaybackCoordinator(
         playerController.activateVisibleCard(entryId, 0)
         startProgressAndLog(0)
         repository.cleanupToAdjacent(viewState.entryIds, viewState.currentEntryIndex)
+        scheduleAdjacentPreload()
         handler.postDelayed({ stateMachine.forceState(PlaybackState.ShowingCard) }, 40L)
     }
 
@@ -237,6 +259,13 @@ class StoryPlaybackCoordinator(
             dataRepository.hasDuration(candidate)
         }
         progressManager.showCard(cardIndex, dataRepository.getCardDuration(card))
+    }
+
+    private fun scheduleAdjacentPreload() {
+        preloadAdjacentEntriesUseCase.schedule(
+            entryIds = viewState.entryIds,
+            currentEntryIndex = viewState.currentEntryIndex
+        )
     }
 }
 

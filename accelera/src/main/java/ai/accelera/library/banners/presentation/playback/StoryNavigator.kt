@@ -2,6 +2,9 @@ package ai.accelera.library.banners.presentation.playback
 
 import ai.accelera.library.banners.domain.model.StoryViewState
 
+/**
+ * Pure navigation policy for card and entry transitions.
+ */
 class StoryNavigator {
     sealed class CardMove {
         data class ShowCard(val index: Int) : CardMove()
