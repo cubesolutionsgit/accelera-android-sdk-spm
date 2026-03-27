@@ -7,6 +7,7 @@ import ai.accelera.library.utils.closable
 import ai.accelera.library.utils.toJsonBytes
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,13 +24,21 @@ fun AcceleraBanner(
     data: Map<String, Any?>? = null,
     modifier: Modifier = Modifier
 ) {
-    var jsonData by remember { mutableStateOf<ByteArray?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    val requestData by remember(data) {
+        derivedStateOf { data?.toJsonBytes() }
+    }
+    val requestKey by remember(requestData) {
+        derivedStateOf { requestData?.decodeToString() ?: "__empty_request__" }
+    }
+
+    var jsonData by rememberSaveable(requestKey) { mutableStateOf<ByteArray?>(null) }
+    var isLoading by rememberSaveable(requestKey) { mutableStateOf(jsonData == null) }
     val loadBannerContentUseCase = remember { DefaultLoadBannerContentUseCase() }
 
-    LaunchedEffect(data) {
+    LaunchedEffect(requestKey) {
+        if (jsonData != null) return@LaunchedEffect
+
         isLoading = true
-        val requestData = data?.toJsonBytes()
         loadBannerContentUseCase.load(requestData) { result, error ->
             if (error != null) {
                 Accelera.shared.error("Failed to load content: ${error.message}")
