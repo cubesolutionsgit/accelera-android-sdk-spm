@@ -21,10 +21,10 @@ import ai.accelera.spmlibrary.ui.theme.SpmLibraryTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Initialize Accelera SDK
         initializeAccelera()
-        
+
         enableEdgeToEdge()
         setContent {
             SpmLibraryTheme {
@@ -36,37 +36,36 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    
+
     private fun initializeAccelera() {
         // Configure Accelera with your API endpoint and token
         // For demo purposes, using empty config - you can provide custom API via delegate
         Accelera.shared.configure(
             config = AcceleraConfig(
-                url = "https://mcp.accelera.ai", // Example URL for banner loading
-                systemToken = "your-system-token" // Replace with your token
+                url = BuildConfig.ACCELERA_URL,
+                systemToken = BuildConfig.ACCELERA_TOKEN
             )
         )
-        
+
         // Set delegate for logging and handling events
         Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
             override fun action(action: String) {
                 android.util.Log.d("Accelera", "Action received: $action")
                 // Handle custom actions here
             }
-            
+
             override fun handleUrl(url: android.net.Uri) {
                 android.util.Log.d("Accelera", "Handle URL: $url")
                 // Handle URLs (e.g., open in browser, deep links, etc.)
             }
         })
-        
+
         // Set user info (optional)
         Accelera.shared.setUserInfo(
             """
             {
-                "clientId": "123",
-                "email": "user@example.com",
-                "theme": "dark"
+                "client_id": "asd",
+                "language": "KZ"
             }
             """.trimIndent()
         )
@@ -86,14 +85,14 @@ fun ExampleScreen(modifier: Modifier = Modifier) {
             text = "Accelera SDK Example",
             style = MaterialTheme.typography.headlineMedium
         )
-        
+
         Text(
             text = "This example demonstrates how to use Accelera SDK with Compose",
             style = MaterialTheme.typography.bodyMedium
         )
-        
+
         Divider()
-        
+
         // Example: Banner
         Card(
             modifier = Modifier.fillMaxWidth()
@@ -110,18 +109,19 @@ fun ExampleScreen(modifier: Modifier = Modifier) {
                     text = "Loads banner content from API",
                     style = MaterialTheme.typography.bodySmall
                 )
-                
+
                 // Banner composable
                 AcceleraBanner(
                     data = mapOf(
                         "type" to "banner",
-                        "category" to "main_screen"
+                        "slot" to "messages_top_banner",
+                        "channel" to "dev"
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         }
-        
+
         // Example: Stories
         Card(
             modifier = Modifier.fillMaxWidth()
@@ -138,18 +138,20 @@ fun ExampleScreen(modifier: Modifier = Modifier) {
                     text = "Loads stories content from API. Tap on a story to open fullscreen.",
                     style = MaterialTheme.typography.bodySmall
                 )
-                
+
                 // Stories composable - displays horizontal ribbon of stories
                 // Click handling for fullscreen is done via div-action://fullscreen in AcceleraUrlHandler
                 AcceleraStories(
                     data = mapOf(
-                        "type" to "stories"
+                        "type" to "stories",
+                        "slot" to "story",
+                        "channel" to "test_channel"
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
