@@ -48,6 +48,20 @@ interface AcceleraDelegate {
     fun action(actionName: String, params: Map<String, String>, meta: Any?) {
         action(actionName)
     }
+
+    /**
+     * Called when a "link" div-action is triggered from inside the fullscreen stories screen.
+     *
+     * Return `true` (default) to automatically close the stories screen after [handleUrl] fires —
+     * this is the correct behaviour for standard deep-link navigation so the user can see the
+     * destination immediately.
+     *
+     * Return `false` to keep the stories screen open — useful when the link opens an in-app
+     * bottom sheet, an overlay browser, or any UI that should appear on top of the stories.
+     *
+     * @param url The URL that is about to be handled via [handleUrl].
+     */
+    fun shouldDismissStoriesOnLink(url: android.net.Uri): Boolean = true
 }
 
 /**
@@ -77,5 +91,7 @@ open class DefaultAcceleraDelegate : AcceleraDelegate {
     override fun action(actionName: String, params: Map<String, String>, meta: Any?) {
         action(actionName)
     }
+
+    override fun shouldDismissStoriesOnLink(url: android.net.Uri): Boolean = true
 }
 

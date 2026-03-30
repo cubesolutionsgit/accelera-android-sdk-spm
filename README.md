@@ -1,41 +1,54 @@
 # Accelera SDK
 
-Библиотека `Accelera` — это модульный SDK для интеграции динамического контента (баннеров и сторис) и push-уведомлений в ваше Android-приложение.
+Библиотека `Accelera` — модульный SDK для интеграции динамического контента (баннеров и сторис) в Android-приложение на основе [Yandex DivKit](https://divkit.tech/).
+
+## Содержание
+
+- [Установка](#-установка)
+- [Инициализация](#-инициализация)
+- [Делегат](#-делегат)
+- [Информация о пользователе](#-информация-о-пользователе)
+- [Отображение контента](#-отображение-контента)
+  - [Jetpack Compose](#jetpack-compose)
+  - [View / XML](#view--xml)
+- [Обработка действий и диплинков](#-обработка-действий-и-диплинков)
+- [Сторис: поведение при диплинке](#-сторис-поведение-при-диплинке)
+- [Кастомный API](#-кастомный-api)
+
+---
 
 ## 📦 Установка
 
-### Через Maven
-
-Добавьте репозиторий и зависимость в ваш `build.gradle.kts` (или `build.gradle`):
+### JitPack
 
 ```kotlin
-repositories {
-    maven {
-        url = uri("https://jitpack.io")
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri("https://jitpack.io") }
     }
-    // или ваш Maven репозиторий
 }
 
+// build.gradle.kts (app)
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.4.5")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.4.7")
 }
 ```
 
-### Добавление модуля в проект
-
-Если вы используете библиотеку как локальный модуль, добавьте в ваш `build.gradle.kts`:
+### Локальный модуль
 
 ```kotlin
+// build.gradle.kts (app)
 dependencies {
     implementation(project(":accelera"))
 }
 ```
 
-Или соберите AAR файл и добавьте его в проект.
+---
 
-## ⚙️ Конфигурация
+## ⚙️ Инициализация
 
-### Стандартная инициализация
+Вызывайте `configure` как можно раньше — например, в `Application.onCreate()` или в `Activity.onCreate()` до `setContent`.
 
 ```kotlin
 import ai.accelera.library.Accelera
@@ -49,93 +62,124 @@ Accelera.shared.configure(
 )
 ```
 
-### Кастомный API (без конфигурации)
+| Поле | Описание |
+|------|----------|
+| `url` | Базовый URL API. SDK добавляет `/api/v1/content` и `/api/v1/events` автоматически |
+| `systemToken` | Токен системы, передаётся в заголовке `Authorization` |
+| `userInfo` | Опциональный JSON с данными пользователя (см. [ниже](#-информация-о-пользователе)) |
 
-Если вы хотите самостоятельно обрабатывать сетевые вызовы, достаточно настроить делегат:
+---
+
+## 🔔 Делегат
+
+Делегат — главная точка получения событий из SDK. Устанавливайте сразу после `configure`.
 
 ```kotlin
-Accelera.shared.configure(config = AcceleraConfig()) // пустой конфиг
+import ai.accelera.library.DefaultAcceleraDelegate
 
 Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
-    override val customAPI: AcceleraAPIProtocol? = MyCustomAPI()
+
+    // Диплинки и внешние ссылки из баннеров/сторис
+    override fun handleUrl(url: android.net.Uri) {
+        navController.tryDeepLinkNavigate(url.toString(), context)
+    }
+
+    // Произвольные действия (actionName из div-action://<actionName>)
+    override fun action(action: String) {
+        Log.d("Accelera", "action: $action")
+    }
+
+    // Расширенная версия с параметрами и метаданными контента
+    override fun action(actionName: String, params: Map<String, String>, meta: Any?) {
+        Log.d("Accelera", "action=$actionName params=$params")
+    }
+
+    // Логирование (по умолчанию — Log.d)
+    override fun log(message: String) { Log.d("Accelera", message) }
+    override fun error(error: String) { Log.e("Accelera", error) }
 })
 ```
 
+### Методы делегата
+
+| Метод | Когда вызывается |
+|-------|-----------------|
+| `handleUrl(url)` | Пользователь нажал на ссылку в баннере или сторис |
+| `action(action)` | Произвольное действие (строка) |
+| `action(actionName, params, meta)` | Действие с параметрами и метаданными |
+| `shouldDismissStoriesOnLink(url)` | Нажатие на ссылку внутри полноэкранных сторис (см. [ниже](#-сторис-поведение-при-диплинке)) |
+| `log(message)` / `error(error)` | Сообщения SDK для отладки |
+| `customAPI` | Переопределение сетевого слоя (см. [ниже](#-кастомный-api)) |
+
+---
+
+## 👤 Информация о пользователе
+
+Пользовательский контекст автоматически добавляется к каждому запросу на загрузку контента. Обновляйте при смене профиля или авторизации.
+
 ```kotlin
-class MyCustomAPI : AcceleraAPIProtocol {
-    override fun loadBanner(
-        data: ByteArray?,
-        completion: (ByteArray?, NetworkError?) -> Unit
-    ): Any? {
-        // вызов вашего backend
-        // completion(result, null) // успех
-        // completion(null, NetworkError(...)) // ошибка
+Accelera.shared.setUserInfo(
+    """
+    {
+        "client_id": "user-123",
+        "language": "ru",
+        "segment": "premium"
     }
-    
-    // ... остальные методы
-}
+    """.trimIndent()
+)
 ```
 
-> ☝️ Все методы взаимодействия с сервером — **POST**.
+> Набор полей определяется серверной конфигурацией вашего проекта.
 
-## 📐 Размещение контента
+---
 
-Контент отображается в контейнерах, которые вы добавляете на экран.
+## 📐 Отображение контента
 
-### Использование Jetpack Compose
+### Jetpack Compose
+
+Оба компонента безопасно используются внутри `LazyColumn` — состояние загруженного контента сохраняется при прокрутке.
 
 ```kotlin
 import ai.accelera.library.compose.AcceleraBanner
 import ai.accelera.library.compose.AcceleraStories
 
-// Баннер
-AcceleraBanner(
-    data = mapOf(
-        "type" to "banner",
-        "category" to "main_screen"
-    ),
-    modifier = Modifier.fillMaxWidth()
-)
+LazyColumn {
+    item(key = "stories") {
+        AcceleraStories(
+            data = mapOf(
+                "type" to "stories",
+                "slot" to "home_top"
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 
-// Сторис
-AcceleraStories(
-    data = mapOf(
-        "type" to "stories"
-    ),
-    modifier = Modifier.fillMaxWidth()
-)
+    item(key = "banner") {
+        AcceleraBanner(
+            data = mapOf(
+                "type" to "banner",
+                "slot" to "messages_top_banner"
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
 ```
 
-### Использование View (ViewGroup)
+> **Важно:** используйте стабильный `key` для каждого item в `LazyColumn` — это гарантирует корректное восстановление состояния при прокрутке.
 
-#### Программно
+#### Параметры компонентов
 
-```kotlin
-import ai.accelera.library.banners.AcceleraBanners
-import android.view.ViewGroup
-import android.widget.LinearLayout
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `data` | `Map<String, Any?>?` | Параметры запроса (тип, слот, канал и др.) — зависят от серверной конфигурации |
+| `modifier` | `Modifier` | Стандартный Compose-модификатор |
 
-val storiesContainer = LinearLayout(context).apply {
-    layoutParams = ViewGroup.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT,
-        ViewGroup.LayoutParams.WRAP_CONTENT
-    )
-}
+---
 
-val bannerContainer = LinearLayout(context).apply {
-    layoutParams = ViewGroup.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT,
-        ViewGroup.LayoutParams.WRAP_CONTENT
-    )
-}
+### View / XML
 
-parentView.addView(storiesContainer)
-parentView.addView(bannerContainer)
-```
-
-#### Через XML Layout
-
-1. Добавьте `ViewGroup` для баннеров и сторис в ваш layout:
+#### XML-разметка
 
 ```xml
 <LinearLayout
@@ -151,93 +195,150 @@ parentView.addView(bannerContainer)
     android:orientation="vertical" />
 ```
 
-2. Создайте ссылку в вашем Activity/Fragment:
-
-```kotlin
-val storiesContainer: ViewGroup = findViewById(R.id.stories_container)
-val bannerContainer: ViewGroup = findViewById(R.id.banner_container)
-```
-
-Далее в обоих случаях нужно привязать элементы к библиотеке:
+#### Kotlin
 
 ```kotlin
 import ai.accelera.library.banners.AcceleraBanners
 import ai.accelera.library.utils.toJsonBytes
 
+val storiesContainer: ViewGroup = findViewById(R.id.stories_container)
+val bannerContainer: ViewGroup  = findViewById(R.id.banner_container)
+
 AcceleraBanners.attachContentPlaceholder(
     container = storiesContainer,
-    data = mapOf("type" to "stories").toJsonBytes()
+    data = mapOf("type" to "stories", "slot" to "home_top").toJsonBytes()
 )
 
 AcceleraBanners.attachContentPlaceholder(
     container = bannerContainer,
-    data = mapOf("type" to "banner").toJsonBytes()
+    data = mapOf("type" to "banner", "slot" to "messages_top_banner").toJsonBytes()
 )
 ```
 
-### ℹ️ Параметры метода `attachContentPlaceholder`
+#### Параметры `attachContentPlaceholder`
 
 | Параметр | Тип | Описание |
 |----------|-----|----------|
-| `container` | ViewGroup | Контейнер для отображения контента |
-| `data` | ByteArray? | Конфигурация контента в формате JSON. Может содержать тип и параметры |
+| `container` | `ViewGroup` | Контейнер для отображения контента |
+| `data` | `ByteArray?` | Параметры запроса в формате JSON-байт |
 
-#### 🔸 Типы контента:
+---
 
-- `"stories"` — сторис (горизонтальная лента историй, при клике можно открыть на полный экран)
-- `"banner"` — баннеры (статичный или карусель)
+## ⚡️ Обработка действий и диплинков
 
-#### 🔹 Пример
-
-```kotlin
-AcceleraBanners.attachContentPlaceholder(
-    container = bannerContainer,
-    data = mapOf(
-        "type" to "banner",
-        "category" to "main_screen",
-        "user_segment" to "premium"
-    ).toJsonBytes()
-)
-```
-
-Конкретный набор параметров зависит от вашей серверной конфигурации и бизнес-логики.
-
-## ⚡️ Обработка действий
-
-Если пользователь нажимает на баннер или сторис, или происходит другое действие — оно передаётся в делегат:
+Все нажатия на интерактивные элементы баннеров и сторис транслируются через делегат.
 
 ```kotlin
-import ai.accelera.library.DefaultAcceleraDelegate
-
 Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
-    override fun action(action: String) {
-        Log.d("Accelera", "Действие: $action")
+
+    override fun handleUrl(url: android.net.Uri) {
+        // Вызывается при div-action://link?url=...
+        navController.tryDeepLinkNavigate(url.toString(), context)
+    }
+
+    override fun action(actionName: String, params: Map<String, String>, meta: Any?) {
+        // Вызывается при div-action://<actionName>?param=value
+        when (actionName) {
+            "view"      -> trackImpression(meta)
+            "click"     -> trackClick(params)
+        }
     }
 })
 ```
 
-## 👤 Информация о пользователе
+### Типы div-action
 
-```kotlin
-Accelera.shared.setUserInfo(
-    """
-    {
-        "clientId": "123",
-        "email": "john@example.com",
-        "theme": "dark"
-    }
-    """.trimIndent()
-)
-```
-
-Вызывайте:
-- после авторизации
-- при смене профиля/темы
-- при любом событии, которое может поменять вид контента
+| URI | Поведение |
+|-----|-----------|
+| `div-action://fullscreen?id=<entryId>` | Открывает `FullscreenActivity` со сторис |
+| `div-action://link?url=<url>` | Передаёт URL в `delegate.handleUrl()` |
+| `div-action://close` | Закрывает текущий экран (только внутри `FullscreenActivity`) |
+| `div-action://<custom>` | Передаётся в `delegate.action()` |
 
 ---
 
-📄 Версия: `0.4.5`  
-📆 Обновлено: октябрь 2025  
-📫 Поддержка: [@cubesolutions](https://github.com/cubesolutionsgit)  
+## 🔁 Сторис: поведение при диплинке
+
+По умолчанию при нажатии на ссылку внутри полноэкранных сторис SDK автоматически закрывает `FullscreenActivity` — чтобы пользователь сразу увидел экран назначения навигации.
+
+Если в вашем сценарии ссылка открывает оверлей (bottom sheet, in-app браузер), сторис можно оставить открытыми:
+
+```kotlin
+Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
+
+    override fun handleUrl(url: android.net.Uri) {
+        navController.tryDeepLinkNavigate(url.toString(), context)
+    }
+
+    /**
+     * true  — закрыть сторис после перехода (по умолчанию)
+     * false — оставить сторис открытыми (например, при открытии bottom sheet)
+     */
+    override fun shouldDismissStoriesOnLink(url: android.net.Uri): Boolean {
+        return url.host != "sheet" // пример: оставить открытыми для внутренних оверлеев
+    }
+})
+```
+
+### Порядок выполнения при `shouldDismissStoriesOnLink = true`
+
+1. `handleUrl(url)` вызывается сразу — навигация в `MainActivity` выполняется.
+2. `FullscreenActivity` запускает анимацию закрытия.
+3. После завершения анимации пользователь видит целевой экран.
+
+---
+
+## 🔧 Кастомный API
+
+Используйте, если хотите полностью заменить сетевой слой SDK (например, для тестирования или проксирования).
+
+```kotlin
+import ai.accelera.library.api.AcceleraAPIProtocol
+import ai.accelera.library.networking.NetworkError
+
+class MyCustomAPI : AcceleraAPIProtocol {
+    override fun loadBanner(
+        data: ByteArray?,
+        completion: (ByteArray?, NetworkError?) -> Unit
+    ) {
+        // вызов вашего backend
+        completion(responseBytes, null)   // успех
+        // completion(null, NetworkError.Server(500, "error")) // ошибка
+    }
+
+    override fun logEvent(
+        data: ByteArray?,
+        completion: (ByteArray?, NetworkError?) -> Unit
+    ) {
+        completion(null, null)
+    }
+}
+
+Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
+    override val customAPI: AcceleraAPIProtocol = MyCustomAPI()
+})
+```
+
+> Все запросы SDK — **POST**. При наличии `customAPI` стандартный `AcceleraAPI` (OkHttp) не используется.
+
+---
+
+## Требования
+
+- Android minSdk **21**
+- Kotlin **1.9+**
+- Jetpack Compose BOM **2024.01+** (для Compose-компонентов)
+- Добавьте `FullscreenActivity` в `AndroidManifest.xml` вашего приложения:
+
+```xml
+<activity
+    android:name="ai.accelera.library.banners.presentation.ui.FullscreenActivity"
+    android:theme="@style/Theme.AppCompat.NoActionBar" />
+```
+
+---
+
+📄 Версия: `0.4.7`
+📆 Обновлено: март 2026
+📫 Поддержка: [@cubesolutionsgit](https://github.com/cubesolutionsgit)
 🔗 Репозиторий: [accelera-android-sdk-spm](https://github.com/cubesolutionsgit/accelera-android-sdk-spm)

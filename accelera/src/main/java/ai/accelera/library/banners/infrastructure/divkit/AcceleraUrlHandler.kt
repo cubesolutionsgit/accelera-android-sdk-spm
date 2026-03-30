@@ -14,6 +14,13 @@ import com.yandex.div.json.expressions.ExpressionResolver
 import com.yandex.div2.DivAction
 import org.json.JSONObject
 
+/** Recursively unwraps [ContextWrapper] layers to find the underlying [Activity], if any. */
+private fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 /**
  * URL handler for DivKit actions.
  * Handles div-action:// URLs for fullscreen, link, and close actions.
@@ -58,13 +65,10 @@ internal class AcceleraUrlHandler(
             "fullscreen" -> {
                 val id = uri.getQueryParameter("id") ?: return false
 
-                // Get Activity context for starting activity
-                val activity = context as? Activity
-                    ?: (context as? ContextWrapper)?.baseContext as? Activity
-                    ?: run {
-                        Accelera.Companion.shared.error("No Activity context available to start FullscreenActivity")
-                        return false
-                    }
+                val activity = context.findActivity() ?: run {
+                    Accelera.Companion.shared.error("No Activity context available to start FullscreenActivity")
+                    return false
+                }
 
                 val intent = Intent(activity, FullscreenActivity::class.java).apply {
                     putExtra("jsonData", jsonData)
@@ -79,7 +83,18 @@ internal class AcceleraUrlHandler(
                 if (urlParam != null) {
                     try {
                         val finalUrl = Uri.parse(urlParam)
+                        // Fire the deep-link first so MainActivity navigates while the close
+                        // animation plays — the user lands on the correct destination instantly.
                         Accelera.Companion.shared.handleUrl(finalUrl)
+
+                        // If we're inside FullscreenActivity, ask the delegate whether to close it.
+                        // Default is true so standard deep-link navigation is always visible.
+                        val activity = context.findActivity()
+                        if (activity is FullscreenActivity) {
+                            val shouldDismiss = Accelera.Companion.shared.getDelegate()
+                                ?.shouldDismissStoriesOnLink(finalUrl) ?: true
+                            if (shouldDismiss) activity.requestClose()
+                        }
                         return true
                     } catch (e: Exception) {
                         Accelera.Companion.shared.error("Could not construct URL from: $urlParam")

@@ -111,6 +111,15 @@ class FullscreenActivity : AppCompatActivity() {
         gestureHandler.setupTouchListener()
     }
 
+    /**
+     * Called by [ai.accelera.library.banners.infrastructure.divkit.AcceleraUrlHandler] when a
+     * "link" action is triggered from within this screen and the delegate requests auto-dismiss.
+     * Triggers the same close animation as the X button / swipe-down gesture.
+     */
+    internal fun requestClose() {
+        closeStories()
+    }
+
     private fun closeStories() {
         activityAnimator.animateClose(rootLayout) {
             finish()
