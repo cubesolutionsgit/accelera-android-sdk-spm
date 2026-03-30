@@ -5,8 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -38,8 +37,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initializeAccelera() {
-        // Configure Accelera with your API endpoint and token
-        // For demo purposes, using empty config - you can provide custom API via delegate
         Accelera.shared.configure(
             config = AcceleraConfig(
                 url = BuildConfig.ACCELERA_URL,
@@ -47,20 +44,16 @@ class MainActivity : ComponentActivity() {
             )
         )
 
-        // Set delegate for logging and handling events
         Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
             override fun action(action: String) {
                 android.util.Log.d("Accelera", "Action received: $action")
-                // Handle custom actions here
             }
 
             override fun handleUrl(url: android.net.Uri) {
                 android.util.Log.d("Accelera", "Handle URL: $url")
-                // Handle URLs (e.g., open in browser, deep links, etc.)
             }
         })
 
-        // Set user info (optional)
         Accelera.shared.setUserInfo(
             """
             {
@@ -72,86 +65,105 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Demo screen using LazyColumn to reproduce and verify the scroll-disappear bug.
+ *
+ * Reproduction steps:
+ *  1. Run the app — stories and banner appear at the top.
+ *  2. Scroll down past the filler cards so stories/banner leave the screen.
+ *  3. Scroll back up — content must render immediately without navigating away.
+ */
 @Composable
 fun ExampleScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "Accelera SDK Example",
-            style = MaterialTheme.typography.headlineMedium
-        )
+        item(key = "header") {
+            Text(
+                text = "Accelera SDK Example",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Scroll down and back up — banners must stay visible.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+        }
 
-        Text(
-            text = "This example demonstrates how to use Accelera SDK with Compose",
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Divider()
-
-        // Example: Banner
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Banner Example",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Loads banner content from API",
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                // Banner composable
-                AcceleraBanner(
-                    data = mapOf(
-                        "type" to "banner",
-                        "slot" to "messages_top_banner",
-                        "channel" to "dev"
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+        // ── Stories ──────────────────────────────────────────────────────────
+        item(key = "stories") {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "Stories", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Tap a story to open fullscreen.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    AcceleraStories(
+                        data = mapOf(
+                            "type" to "stories",
+                            "slot" to "story",
+                            "channel" to "test_channel"
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 
-        // Example: Stories
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Stories Example",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Loads stories content from API. Tap on a story to open fullscreen.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                // Stories composable - displays horizontal ribbon of stories
-                // Click handling for fullscreen is done via div-action://fullscreen in AcceleraUrlHandler
-                AcceleraStories(
-                    data = mapOf(
-                        "type" to "stories",
-                        "slot" to "story",
-                        "channel" to "test_channel"
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+        // ── Banner ───────────────────────────────────────────────────────────
+        item(key = "banner") {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "Banner", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Loads banner content from API.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    AcceleraBanner(
+                        data = mapOf(
+                            "type" to "banner",
+                            "slot" to "messages_top_banner",
+                            "channel" to "dev"
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // ── Filler items — scroll these to push stories off-screen ───────────
+        items(count = 10, key = { "filler_$it" }) { index ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Filler card ${index + 1} — scroll past this to hide stories",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        item(key = "footer") {
+            Text(
+                text = "Scroll back up to verify stories & banner are still visible.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
     }
 }
