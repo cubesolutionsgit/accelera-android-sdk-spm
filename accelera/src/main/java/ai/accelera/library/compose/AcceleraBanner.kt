@@ -90,6 +90,7 @@ fun AcceleraBanner(
                         },
                         modifier = Modifier
                             .align(Alignment.TopEnd)
+                            .statusBarsPadding()
                             .padding(8.dp)
                     )
                 }
