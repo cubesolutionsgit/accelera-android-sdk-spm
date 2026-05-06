@@ -10,6 +10,9 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 
 class FullscreenActivity : AppCompatActivity() {
 
@@ -45,12 +48,15 @@ class FullscreenActivity : AppCompatActivity() {
             )
         }
 
+        val progressBaseTop = (4 * resources.displayMetrics.density).toInt()
+        val closeBaseTop = (24 * resources.displayMetrics.density).toInt()
+
         progressContainer = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = (8 * resources.displayMetrics.density).toInt()
+                topMargin = progressBaseTop
                 marginStart = (8 * resources.displayMetrics.density).toInt()
                 marginEnd = (8 * resources.displayMetrics.density).toInt()
             }
@@ -65,7 +71,7 @@ class FullscreenActivity : AppCompatActivity() {
                 (24 * resources.displayMetrics.density).toInt(),
                 (24 * resources.displayMetrics.density).toInt()
             ).apply {
-                topMargin = (16 * resources.displayMetrics.density).toInt()
+                topMargin = closeBaseTop
                 marginEnd = (16 * resources.displayMetrics.density).toInt()
                 gravity = Gravity.TOP or Gravity.END
             }
@@ -75,6 +81,17 @@ class FullscreenActivity : AppCompatActivity() {
         rootLayout.addView(closeButton)
         progressContainer.elevation = 10f
         closeButton.elevation = 20f
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { _, insets ->
+            val statusTop = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            progressContainer.updateLayoutParams<FrameLayout.LayoutParams> {
+                topMargin = statusTop + progressBaseTop
+            }
+            closeButton.updateLayoutParams<FrameLayout.LayoutParams> {
+                topMargin = statusTop + closeBaseTop
+            }
+            insets
+        }
 
         setContentView(rootLayout)
         activityAnimator = StoryEntryAnimator(rootLayout)
