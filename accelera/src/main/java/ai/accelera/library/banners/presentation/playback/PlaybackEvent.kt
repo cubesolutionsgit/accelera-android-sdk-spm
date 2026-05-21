@@ -4,6 +4,7 @@ sealed class PlaybackEvent {
     data class Open(val entryId: String) : PlaybackEvent()
     object TapNext : PlaybackEvent()
     object TapPrev : PlaybackEvent()
+    object AutoNext : PlaybackEvent()
     object SwipeNextEntry : PlaybackEvent()
     object SwipePrevEntry : PlaybackEvent()
     object LongPressStart : PlaybackEvent()

@@ -4,7 +4,9 @@ import ai.accelera.library.Accelera
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
 import ai.accelera.library.banners.presentation.ui.CloseButton
 import ai.accelera.library.utils.closable
+import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.toJsonBytes
+import org.json.JSONObject
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -84,6 +86,9 @@ fun AcceleraBanner(
                         factory = { ctx ->
                             CloseButton(ctx).apply {
                                 setOnClickListener {
+                                    val meta = (currentJsonData.meta as? JSONObject) ?: JSONObject()
+                                    val payload = mapOf("event" to "close", "meta" to meta)
+                                    Accelera.shared.logEvent(payload.toJsonBytes())
                                     showCloseButton = false
                                 }
                             }

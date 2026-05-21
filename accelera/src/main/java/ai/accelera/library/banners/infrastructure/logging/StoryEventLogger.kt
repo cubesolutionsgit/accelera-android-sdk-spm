@@ -27,13 +27,30 @@ class StoryEventLogger(
             analytics.logError("Error logging view event: ${e.message}")
         }
     }
+
+    fun logCardClose(card: JSONObject) {
+        try {
+            val meta = card.optJSONObject("card")?.optJSONObject("meta") ?: JSONObject()
+            analytics.logCardClose(meta)
+        } catch (e: Exception) {
+            analytics.logError("Error logging close event: ${e.message}")
+        }
+    }
 }
 
 class AcceleraStoryAnalytics : StoryAnalytics {
     override fun logCardView(meta: JSONObject) {
         val eventPayload = mapOf(
             "event" to "view",
-            "meta" to meta.toString()
+            "meta" to meta
+        )
+        Accelera.shared.logEvent(eventPayload.toJsonBytes())
+    }
+
+    override fun logCardClose(meta: JSONObject) {
+        val eventPayload = mapOf(
+            "event" to "close",
+            "meta" to meta
         )
         Accelera.shared.logEvent(eventPayload.toJsonBytes())
     }

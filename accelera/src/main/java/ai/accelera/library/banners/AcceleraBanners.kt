@@ -2,11 +2,14 @@ package ai.accelera.library.banners
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.utils.closable
+import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.parentActivity
+import ai.accelera.library.utils.toJsonBytes
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.CloseButton
 import android.view.ViewGroup
+import org.json.JSONObject
 
 /**
  * Extension functions for Accelera banners module (similar to Accelera+Banners in iOS).
@@ -83,7 +86,9 @@ object AcceleraBanners {
                     if (jsonData.closable == true) {
                         val closeButton = CloseButton(activity).apply {
                             setOnClickListener {
-                                // Remove divView from container (similar to iOS: divView.removeFromSuperview())
+                                val meta = (jsonData.meta as? JSONObject) ?: JSONObject()
+                                val payload = mapOf("event" to "close", "meta" to meta)
+                                Accelera.shared.logEvent(payload.toJsonBytes())
                                 container.removeView(divView)
                             }
                         }

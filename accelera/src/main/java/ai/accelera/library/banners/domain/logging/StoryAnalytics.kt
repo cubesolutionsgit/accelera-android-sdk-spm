@@ -4,5 +4,6 @@ import org.json.JSONObject
 
 interface StoryAnalytics {
     fun logCardView(meta: JSONObject)
+    fun logCardClose(meta: JSONObject)
     fun logError(message: String)
 }

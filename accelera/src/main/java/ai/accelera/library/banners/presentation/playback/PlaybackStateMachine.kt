@@ -61,7 +61,8 @@ class PlaybackStateMachine {
 
             PlaybackState.ShowingCard -> when (event) {
                 PlaybackEvent.TapNext,
-                PlaybackEvent.TapPrev -> current
+                PlaybackEvent.TapPrev,
+                PlaybackEvent.AutoNext -> current
                 PlaybackEvent.SwipeNextEntry,
                 PlaybackEvent.SwipePrevEntry -> PlaybackState.TransitioningEntry
                 PlaybackEvent.LongPressStart -> PlaybackState.PausedByGesture

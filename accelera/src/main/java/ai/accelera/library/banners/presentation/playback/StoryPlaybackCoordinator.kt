@@ -26,7 +26,7 @@ class StoryPlaybackCoordinator(
         progressContainer = progressContainer,
         jsonData = jsonData,
         lifecycleOwner = lifecycleOwner,
-        onProgressComplete = { handleEvent(PlaybackEvent.TapNext) }
+        onProgressComplete = { handleEvent(PlaybackEvent.AutoNext) }
     )
     private val handler = deps.handler
     private val dataRepository = deps.dataSource
@@ -68,10 +68,15 @@ class StoryPlaybackCoordinator(
      */
     fun handleEvent(event: PlaybackEvent) {
         when (event) {
-            PlaybackEvent.TapNext -> processMove(navigator.nextByTap(viewState))
+            PlaybackEvent.TapNext -> {
+                logCurrentCardClose()
+                processMove(navigator.nextByTap(viewState))
+            }
+            PlaybackEvent.AutoNext -> processMove(navigator.nextByTap(viewState))
             PlaybackEvent.TapPrev -> processMove(navigator.prevByTap(viewState))
             PlaybackEvent.SwipeNextEntry -> {
                 if (!stateMachine.onEvent(event)) return
+                logCurrentCardClose()
                 processMove(navigator.nextEntryBySwipe(viewState))
             }
 
@@ -110,6 +115,7 @@ class StoryPlaybackCoordinator(
 
             PlaybackEvent.CloseRequested -> {
                 if (stateMachine.onEvent(event)) {
+                    logCurrentCardClose()
                     progressManager.stopProgress()
                     playerController.pauseForLifecycle()
                     onCloseRequested()
@@ -238,6 +244,11 @@ class StoryPlaybackCoordinator(
         repository.cleanupToAdjacent(viewState.entryIds, viewState.currentEntryIndex)
         scheduleAdjacentPreload()
         handler.postDelayed({ stateMachine.forceState(PlaybackState.ShowingCard) }, 40L)
+    }
+
+    private fun logCurrentCardClose() {
+        val card = viewState.currentCards.getOrNull(viewState.currentCardIndex) ?: return
+        eventLogger.logCardClose(card)
     }
 
     private fun startProgressAndLog(cardIndex: Int) {
