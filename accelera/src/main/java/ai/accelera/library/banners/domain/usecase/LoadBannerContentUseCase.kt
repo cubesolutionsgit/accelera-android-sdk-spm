@@ -1,6 +1,8 @@
 package ai.accelera.library.banners.domain.usecase
 
 import ai.accelera.library.Accelera
+import ai.accelera.library.core.constants.AcceleraEvents
+import ai.accelera.library.core.constants.AcceleraJsonKeys
 import ai.accelera.library.networking.NetworkError
 import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.toJsonBytes
@@ -23,8 +25,8 @@ class DefaultLoadBannerContentUseCase(
         Accelera.shared.getApi().loadBanner(dataWithUserInfo) { result, error ->
             if (logViewEvent && error == null && result != null) {
                 val eventPayload = mapOf(
-                    "event" to "view",
-                    "meta" to (result.meta ?: emptyMap<String, Any?>())
+                    AcceleraJsonKeys.EVENT to AcceleraEvents.VIEW,
+                    AcceleraJsonKeys.META to (result.meta ?: emptyMap<String, Any?>())
                 )
                 Accelera.shared.logEvent(eventPayload.toJsonBytes())
             }

@@ -1,5 +1,6 @@
 package ai.accelera.library.networking
 
+import ai.accelera.library.core.constants.AcceleraHttp
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -20,12 +21,12 @@ enum class RequestMethod {
 class WebClient(private val baseUrl: String) : HttpClient {
     private val client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(NetworkLoggingInterceptor())
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(AcceleraHttp.TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(AcceleraHttp.TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .writeTimeout(AcceleraHttp.TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
-    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+    private val jsonMediaType = AcceleraHttp.MEDIA_TYPE_JSON.toMediaType()
 
     /**
      * Sends a request to the given API path using the specified HTTP method.

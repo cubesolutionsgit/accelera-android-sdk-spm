@@ -1,5 +1,6 @@
 package ai.accelera.library.core.events
 
+import ai.accelera.library.core.constants.AcceleraJsonKeys
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -20,9 +21,9 @@ class JsonEventActionPayloadExtractor : EventActionPayloadExtractor {
     override fun extract(eventData: ByteArray): EventActionPayload? {
         return runCatching {
             val json = JSONObject(String(eventData, Charsets.UTF_8))
-            val actionName = json.optString("event").takeIf { it.isNotBlank() } ?: return null
-            val params = json.optJSONObject("params").toStringMap()
-            val meta = normalizeJsonValue(json.opt("meta"))
+            val actionName = json.optString(AcceleraJsonKeys.EVENT).takeIf { it.isNotBlank() } ?: return null
+            val params = json.optJSONObject(AcceleraJsonKeys.PARAMS).toStringMap()
+            val meta = normalizeJsonValue(json.opt(AcceleraJsonKeys.META))
             EventActionPayload(actionName = actionName, params = params, meta = meta)
         }.getOrNull()
     }

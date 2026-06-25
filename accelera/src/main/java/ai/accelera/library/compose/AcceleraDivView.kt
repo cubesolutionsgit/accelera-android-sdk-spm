@@ -1,6 +1,8 @@
 package ai.accelera.library.compose
 
+import ai.accelera.library.Accelera
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
+import android.view.View
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.*
@@ -42,18 +44,25 @@ fun AcceleraDivView(
     key(lifecycleOwner) {
         AndroidView(
             factory = { ctx ->
-                DivKitSetup.makeView(ctx, jsonData, lifecycleOwner)
+                // Never let DivKit view creation crash the host app; fall back to an
+                // empty view so the composition stays valid.
+                runCatching { DivKitSetup.makeView(ctx, jsonData, lifecycleOwner) }
+                    .onFailure { Accelera.shared.error("Failed to create DivView: ${it.message}") }
+                    .getOrElse { View(ctx) }
             },
             update = { view ->
-                divData?.let { view.setData(it, divTag) }
+                val data = divData ?: return@AndroidView
+                val divView = view as? com.yandex.div.core.view2.Div2View ?: return@AndroidView
+                runCatching { divView.setData(data, divTag) }
+                    .onFailure { Accelera.shared.error("Failed to bind DivView data: ${it.message}") }
             },
             onReset = { view ->
                 // View is about to be reused for a different item in a lazy layout.
-                DivKitSetup.releaseVideoPlayers(view)
+                (view as? com.yandex.div.core.view2.Div2View)?.let { DivKitSetup.releaseVideoPlayers(it) }
             },
             onRelease = { view ->
                 // View is permanently removed from composition.
-                DivKitSetup.releaseVideoPlayers(view)
+                (view as? com.yandex.div.core.view2.Div2View)?.let { DivKitSetup.releaseVideoPlayers(it) }
             },
             modifier = modifier
                 .fillMaxWidth()

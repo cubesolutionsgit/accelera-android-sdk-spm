@@ -5,7 +5,11 @@ import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTrack
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
+import ai.accelera.library.core.constants.AcceleraDimens
+import ai.accelera.library.core.constants.AcceleraEvents
+import ai.accelera.library.core.constants.AcceleraJsonKeys
 import ai.accelera.library.utils.closable
+import ai.accelera.library.utils.dpToPx
 import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.toJsonBytes
 import android.os.Bundle
@@ -32,10 +36,25 @@ class PopupActivity : AppCompatActivity() {
         variableScope = AcceleraScopeRegistry.get(scopeToken)
 
         window.setBackgroundDrawableResource(android.R.color.transparent)
-        setupContent()
+
+        // Never let DivKit setup crash the host app; close the popup instead.
+        val ready = runCatching { setupContent() }
+            .onFailure { Accelera.shared.error("Failed to present popup: ${it.message}") }
+            .getOrDefault(false)
+        if (!ready) finish()
     }
 
-    private fun setupContent() {
+    /** Returns true when content was rendered; false means nothing to show. */
+    private fun setupContent(): Boolean {
+        val tag = DivDataTag("accelera_popup_${System.currentTimeMillis()}")
+        val view = DivKitSetup.makeBoundViewOrNull(
+            context = this,
+            jsonData = jsonData,
+            tag = tag,
+            lifecycleOwner = this,
+            variableScope = variableScope
+        ) ?: return false
+
         val rootLayout = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             layoutParams = ViewGroup.LayoutParams(
@@ -45,7 +64,6 @@ class PopupActivity : AppCompatActivity() {
         }
         setContentView(rootLayout)
 
-        val view = DivKitSetup.makeView(this, jsonData, this, variableScope = variableScope)
         divView = view
         rootLayout.addView(
             view,
@@ -55,45 +73,45 @@ class PopupActivity : AppCompatActivity() {
             )
         )
 
-        DivKitSetup.parseDivData(jsonData)?.let { divData ->
-            view.setData(divData, DivDataTag("accelera_popup_${System.currentTimeMillis()}"))
-        }
-
         logView()
 
         if (jsonData.closable != false) {
             addCloseButton(rootLayout)
         }
+        return true
     }
 
     private fun addCloseButton(rootLayout: FrameLayout) {
-        val density = resources.displayMetrics.density
         val closeButton = CloseButton(this).apply {
             setOnClickListener {
                 logClose()
                 finish()
             }
             layoutParams = FrameLayout.LayoutParams(
-                (24 * density).toInt(),
-                (24 * density).toInt()
+                dpToPx(AcceleraDimens.CLOSE_BUTTON_SIZE_DP),
+                dpToPx(AcceleraDimens.CLOSE_BUTTON_SIZE_DP)
             ).apply {
-                topMargin = (28 * density).toInt()
-                marginEnd = (16 * density).toInt()
+                topMargin = dpToPx(AcceleraDimens.POPUP_CLOSE_TOP_MARGIN_DP)
+                marginEnd = dpToPx(AcceleraDimens.POPUP_CLOSE_END_MARGIN_DP)
                 gravity = Gravity.TOP or Gravity.END
             }
         }
         rootLayout.addView(closeButton)
-        closeButton.elevation = 20f
+        closeButton.elevation = AcceleraDimens.CLOSE_BUTTON_ELEVATION
     }
 
     private fun logView() {
         val meta = jsonData.meta ?: emptyMap<String, Any?>()
-        Accelera.shared.logEvent(mapOf("event" to "view", "meta" to meta).toJsonBytes())
+        Accelera.shared.logEvent(
+            mapOf(AcceleraJsonKeys.EVENT to AcceleraEvents.VIEW, AcceleraJsonKeys.META to meta).toJsonBytes()
+        )
     }
 
     private fun logClose() {
         val meta = (jsonData.meta as? JSONObject) ?: JSONObject()
-        Accelera.shared.logEvent(mapOf("event" to "close", "meta" to meta).toJsonBytes())
+        Accelera.shared.logEvent(
+            mapOf(AcceleraJsonKeys.EVENT to AcceleraEvents.CLOSE, AcceleraJsonKeys.META to meta).toJsonBytes()
+        )
     }
 
     override fun onDestroy() {

@@ -1,12 +1,13 @@
 package ai.accelera.library.utils
 
+import ai.accelera.library.core.constants.AcceleraJsonKeys
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal fun JSONObject.acceleraCardObjectOrNull(): JSONObject? {
-    optJSONObject("card")?.let { return it }
+    optJSONObject(AcceleraJsonKeys.CARD)?.let { return it }
 
-    optJSONArray("cards")?.let { cards ->
+    optJSONArray(AcceleraJsonKeys.CARDS)?.let { cards ->
         for (index in 0 until cards.length()) {
             cards.optJSONObject(index)?.let { return it }
         }
@@ -19,27 +20,34 @@ internal fun JSONObject.acceleraCardObjectOrNull(): JSONObject? {
 internal fun JSONObject.normalizedDivDataObjectOrNull(): JSONObject? {
     val card = acceleraCardObjectOrNull() ?: return null
 
-    if (card.has("states")) {
-        return if (card.has("log_id")) {
+    if (card.has(AcceleraJsonKeys.STATES)) {
+        return if (card.has(AcceleraJsonKeys.LOG_ID)) {
             card
         } else {
-            JSONObject(card.toString()).put("log_id", GENERATED_LOG_ID)
+            JSONObject(card.toString()).put(AcceleraJsonKeys.LOG_ID, AcceleraJsonKeys.GENERATED_LOG_ID)
         }
     }
 
-    val div = card.optJSONObject("div") ?: card.takeIf { it.has("type") } ?: return null
-    val logId = card.optString("log_id").takeIf { it.isNotBlank() } ?: GENERATED_LOG_ID
+    val div = card.optJSONObject(AcceleraJsonKeys.DIV)
+        ?: card.takeIf { it.has(AcceleraJsonKeys.TYPE) }
+        ?: return null
+    val logId = card.optString(AcceleraJsonKeys.LOG_ID).takeIf { it.isNotBlank() }
+        ?: AcceleraJsonKeys.GENERATED_LOG_ID
 
     return JSONObject()
-        .put("log_id", logId)
+        .put(AcceleraJsonKeys.LOG_ID, logId)
         .put(
-            "states",
+            AcceleraJsonKeys.STATES,
             JSONArray().put(
                 JSONObject()
-                    .put("state_id", 0)
-                    .put("div", div)
+                    .put(AcceleraJsonKeys.STATE_ID, 0)
+                    .put(AcceleraJsonKeys.DIV, div)
             )
         )
 }
 
-private const val GENERATED_LOG_ID = "accelera_generated"
+/**
+ * JSON payload that asks the backend to return refreshed content.
+ */
+internal fun refreshPayloadJson(): String =
+    JSONObject().put(AcceleraJsonKeys.REFRESH, true).toString()

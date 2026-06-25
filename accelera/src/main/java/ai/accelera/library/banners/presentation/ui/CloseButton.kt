@@ -6,6 +6,10 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import ai.accelera.library.core.constants.AcceleraColors
+import ai.accelera.library.core.constants.AcceleraDimens
+import ai.accelera.library.utils.dpToPx
+import ai.accelera.library.utils.dpToPxF
 
 /**
  * Close button view for banners.
@@ -16,21 +20,18 @@ class CloseButton @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val density = context.resources.displayMetrics.density
-
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 3f
+        strokeWidth = AcceleraDimens.CLOSE_BUTTON_STROKE_WIDTH_PX
         strokeCap = Paint.Cap.ROUND
     }
 
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.argb(51, 0, 0, 0) // 20% black
+        color = android.graphics.Color.argb(AcceleraColors.CLOSE_BUTTON_BG_ALPHA, 0, 0, 0)
     }
 
-    private val cornerRadius = 12f
-    private val lineLength = 8f
+    private val cornerRadius = AcceleraDimens.CLOSE_BUTTON_CORNER_RADIUS_PX
 
     init {
         setOnClickListener {
@@ -40,7 +41,7 @@ class CloseButton @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val size = (24 * density).toInt()
+        val size = dpToPx(AcceleraDimens.CLOSE_BUTTON_SIZE_DP)
         setMeasuredDimension(size, size)
     }
 
@@ -55,7 +56,7 @@ class CloseButton @JvmOverloads constructor(
         // Draw X
         val centerX = width / 2f
         val centerY = height / 2f
-        val halfLength = lineLength * density
+        val halfLength = dpToPxF(AcceleraDimens.CLOSE_BUTTON_X_HALF_LENGTH_DP)
         
         // Draw two lines forming X
         canvas.drawLine(

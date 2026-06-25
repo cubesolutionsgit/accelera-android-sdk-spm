@@ -7,6 +7,9 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import ai.accelera.library.core.constants.AcceleraGestureConfig
+import ai.accelera.library.core.constants.AcceleraTiming
+import ai.accelera.library.utils.dpToPxF
 import kotlin.math.abs
 
 /**
@@ -35,19 +38,17 @@ class StoryGestureHandler(
     var isTransitioning: () -> Boolean = { false }
     
     // Reduced thresholds for better sensitivity, especially for short swipes
-    private val swipeThreshold = 50 * context.resources.displayMetrics.density
-    private val minSwipeVelocity = 300 * context.resources.displayMetrics.density
-    private val minDragDistance = 5 * context.resources.displayMetrics.density
+    private val minDragDistance = context.dpToPxF(AcceleraGestureConfig.MIN_DRAG_DISTANCE_DP)
     private val screenWidth = context.resources.displayMetrics.widthPixels.toFloat()
     private val screenHeight = context.resources.displayMetrics.heightPixels.toFloat()
-    
+
     // For short swipes, use percentage of screen instead of fixed pixels
-    private val shortSwipeThreshold = screenWidth * 0.15f  // 15% of screen width
-    private val shortSwipeVelocity = 200 * context.resources.displayMetrics.density
-    
+    private val shortSwipeThreshold = screenWidth * AcceleraGestureConfig.SHORT_SWIPE_SCREEN_RATIO
+    private val shortSwipeVelocity = context.dpToPxF(AcceleraGestureConfig.SHORT_SWIPE_VELOCITY_DP)
+
     // For closing stories - require explicit vertical gesture but allow shorter swipes
-    private val closeSwipeThreshold = screenHeight * 0.15f  // 15% of screen height for closing (reduced from 25%)
-    private val closeSwipeVelocity = 300 * context.resources.displayMetrics.density  // Reduced from 400
+    private val closeSwipeThreshold = screenHeight * AcceleraGestureConfig.CLOSE_SWIPE_SCREEN_RATIO
+    private val closeSwipeVelocity = context.dpToPxF(AcceleraGestureConfig.CLOSE_SWIPE_VELOCITY_DP)
 
     private var initialX = 0f
     private var initialY = 0f
@@ -60,7 +61,7 @@ class StoryGestureHandler(
     
     // Protection against rapid gestures
     private var lastGestureTime = 0L
-    private val minGestureInterval = 150L  // Minimum 150ms between gestures
+    private val minGestureInterval = AcceleraTiming.GESTURE_DEBOUNCE_MS
     private val handler = Handler(Looper.getMainLooper())
     private var pendingSwipeAction: (() -> Unit)? = null
 
@@ -83,8 +84,8 @@ class StoryGestureHandler(
                 val tapX = e.x
 
                 // Check if tap is on close button area (top-right corner)
-                val closeButtonSize = (24 * context.resources.displayMetrics.density)
-                val closeButtonMargin = (16 * context.resources.displayMetrics.density)
+                val closeButtonSize = context.dpToPxF(AcceleraGestureConfig.CLOSE_BUTTON_SIZE_DP)
+                val closeButtonMargin = context.dpToPxF(AcceleraGestureConfig.CLOSE_BUTTON_MARGIN_DP)
                 if (tapX > screenWidth - closeButtonSize - closeButtonMargin * 2 &&
                     e.y < closeButtonSize + closeButtonMargin * 2
                 ) {
@@ -95,8 +96,8 @@ class StoryGestureHandler(
                 // Instagram-like behavior: taps for navigation work only on edges (left and right thirds)
                 // Middle third taps are ignored for navigation, but don't block other interactions
                 // Swipes work everywhere regardless of X position
-                val leftThird = screenWidth / 3f
-                val rightThird = screenWidth * 2f / 3f
+                val leftThird = screenWidth / AcceleraGestureConfig.TAP_ZONE_COUNT
+                val rightThird = screenWidth * (AcceleraGestureConfig.TAP_ZONE_COUNT - 1f) / AcceleraGestureConfig.TAP_ZONE_COUNT
 
                 when {
                     tapX < leftThird -> {
@@ -135,8 +136,8 @@ class StoryGestureHandler(
                 // Determine if horizontal or vertical swipe
                 // For horizontal: X movement should be significantly more than Y
                 // For vertical (closing): Y movement should be significantly more than X AND X should be minimal
-                val isHorizontal = absDeltaX > absDeltaY * 1.5f  // 50% more horizontal than vertical (stricter)
-                val isVertical = absDeltaY > absDeltaX * 2.0f && absDeltaX < screenWidth * 0.1f  // Y must be 2x X AND X must be < 10% of screen
+                val isHorizontal = absDeltaX > absDeltaY * AcceleraGestureConfig.HORIZONTAL_DOMINANCE_RATIO  // 50% more horizontal than vertical (stricter)
+                val isVertical = absDeltaY > absDeltaX * AcceleraGestureConfig.VERTICAL_DOMINANCE_RATIO && absDeltaX < screenWidth * AcceleraGestureConfig.VERTICAL_MAX_X_SCREEN_RATIO  // Y must be 2x X AND X must be < 10% of screen
                 
                 if (isHorizontal) {
                     // Horizontal swipe - navigate between entries
@@ -248,8 +249,8 @@ class StoryGestureHandler(
                         // Determine swipe direction with stricter rules
                         // For horizontal: X movement should be significantly more than Y
                         // For vertical (closing): Y movement should be significantly more than X AND X should be minimal
-                        val isHorizontal = absDeltaX > absDeltaY * 1.5f  // 50% more horizontal (stricter)
-                        val isVertical = absDeltaY > absDeltaX * 2.0f && absDeltaX < screenWidth * 0.1f  // Y must be 2x X AND X < 10% screen
+                        val isHorizontal = absDeltaX > absDeltaY * AcceleraGestureConfig.HORIZONTAL_DOMINANCE_RATIO  // 50% more horizontal (stricter)
+                        val isVertical = absDeltaY > absDeltaX * AcceleraGestureConfig.VERTICAL_DOMINANCE_RATIO && absDeltaX < screenWidth * AcceleraGestureConfig.VERTICAL_MAX_X_SCREEN_RATIO  // Y must be 2x X AND X < 10% screen
                         
                         // Check if swipe distance is sufficient
                         val currentTime = System.currentTimeMillis()

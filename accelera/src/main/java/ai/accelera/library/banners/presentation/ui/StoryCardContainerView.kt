@@ -6,7 +6,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import ai.accelera.library.Accelera
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
+import ai.accelera.library.core.constants.AcceleraTiming
 import com.yandex.div.DivDataTag
 
 import com.yandex.div.core.view2.Div2View
@@ -78,35 +80,40 @@ class StoryCardContainerView @JvmOverloads constructor(
         }
         cardViews.clear()
 
-        // Create and add all card views (initially hidden)
+        // Create and add all card views (initially hidden). A failure on one card must
+        // not crash the host app or abort the whole entry — log it and skip that card.
         cards.forEachIndexed { index, card ->
-            val divView = makeDivView()
-            divView.layoutParams = LayoutParams(
-                LayoutParams.MATCH_PARENT,
-                LayoutParams.MATCH_PARENT
-            )
+            runCatching {
+                val divView = makeDivView()
+                divView.layoutParams = LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    LayoutParams.MATCH_PARENT
+                )
 
-            // Load card data
-            val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
-            val divData = DivKitSetup.parseDivData(cardBytes)
-            if (divData != null) {
-                val tag = DivDataTag("story_${entryId}_$index")
-                divView.setData(divData, tag)
+                // Load card data
+                val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
+                val divData = DivKitSetup.parseDivData(cardBytes)
+                if (divData != null) {
+                    val tag = DivDataTag("story_${entryId}_$index")
+                    divView.setData(divData, tag)
+                }
+                // Prevent hidden pre-created cards from playing audio before activation.
+                DivKitSetup.pauseVideoPlayers(divView)
+
+                // Don't intercept touch events - let parent handle gestures
+                divView.isClickable = false
+                divView.isFocusable = false
+                divView.isFocusableInTouchMode = false
+
+                // Initially hidden
+                divView.visibility = View.GONE
+                divView.alpha = 0f
+
+                addView(divView)
+                cardViews[index] = divView
+            }.onFailure { e ->
+                Accelera.shared.error("Failed to set up story card $index: ${e.message}")
             }
-            // Prevent hidden pre-created cards from playing audio before activation.
-            DivKitSetup.pauseVideoPlayers(divView)
-
-            // Don't intercept touch events - let parent handle gestures
-            divView.isClickable = false
-            divView.isFocusable = false
-            divView.isFocusableInTouchMode = false
-
-            // Initially hidden
-            divView.visibility = View.GONE
-            divView.alpha = 0f
-
-            addView(divView)
-            cardViews[index] = divView
         }
     }
 
@@ -139,38 +146,42 @@ class StoryCardContainerView @JvmOverloads constructor(
         cardViews.clear()
 
         cards.forEachIndexed { index, card ->
-            val isCached = cachedViews.containsKey(index)
-            val divView = cachedViews[index] ?: makeDivView()
+            runCatching {
+                val isCached = cachedViews.containsKey(index)
+                val divView = cachedViews[index] ?: makeDivView()
 
-            (divView.parent as? ViewGroup)?.removeView(divView)
+                (divView.parent as? ViewGroup)?.removeView(divView)
 
-            divView.layoutParams = LayoutParams(
-                LayoutParams.MATCH_PARENT,
-                LayoutParams.MATCH_PARENT
-            )
+                divView.layoutParams = LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    LayoutParams.MATCH_PARENT
+                )
 
-            // Only set data on newly created views; cached views already have data from preloading
-            if (!isCached) {
-                val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
-                val divData = DivKitSetup.parseDivData(cardBytes)
-                if (divData != null) {
-                    val tag = DivDataTag("story_${entryId}_$index")
-                    divView.setData(divData, tag)
+                // Only set data on newly created views; cached views already have data from preloading
+                if (!isCached) {
+                    val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
+                    val divData = DivKitSetup.parseDivData(cardBytes)
+                    if (divData != null) {
+                        val tag = DivDataTag("story_${entryId}_$index")
+                        divView.setData(divData, tag)
+                    }
                 }
+                // Keep hidden cards silent until explicitly activated.
+                DivKitSetup.pauseVideoPlayers(divView)
+
+                divView.isClickable = false
+                divView.isFocusable = false
+                divView.isFocusableInTouchMode = false
+                divView.setOnTouchListener { _, _ -> false }
+
+                divView.visibility = View.GONE
+                divView.alpha = 0f
+
+                addView(divView)
+                cardViews[index] = divView
+            }.onFailure { e ->
+                Accelera.shared.error("Failed to set up story card $index: ${e.message}")
             }
-            // Keep hidden cards silent until explicitly activated.
-            DivKitSetup.pauseVideoPlayers(divView)
-
-            divView.isClickable = false
-            divView.isFocusable = false
-            divView.isFocusableInTouchMode = false
-            divView.setOnTouchListener { _, _ -> false }
-
-            divView.visibility = View.GONE
-            divView.alpha = 0f
-
-            addView(divView)
-            cardViews[index] = divView
         }
     }
 
@@ -192,7 +203,7 @@ class StoryCardContainerView @JvmOverloads constructor(
                 if (animate) {
                     currentView.animate()
                         .alpha(0f)
-                        .setDuration(200L)
+                        .setDuration(AcceleraTiming.CARD_FADE_MS)
                         .withEndAction {
                             currentView.visibility = View.GONE
                         }
@@ -209,7 +220,7 @@ class StoryCardContainerView @JvmOverloads constructor(
             targetView.alpha = 0f
             targetView.animate()
                 .alpha(1f)
-                .setDuration(200L)
+                .setDuration(AcceleraTiming.CARD_FADE_MS)
                 .start()
         } else {
             targetView.alpha = 1f

@@ -7,10 +7,15 @@ import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScop
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.CloseButton
+import ai.accelera.library.core.constants.AcceleraDimens
+import ai.accelera.library.core.constants.AcceleraEvents
+import ai.accelera.library.core.constants.AcceleraJsonKeys
 import ai.accelera.library.utils.closable
+import ai.accelera.library.utils.dpToPx
 import ai.accelera.library.utils.mergeJSON
 import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.parentActivity
+import ai.accelera.library.utils.refreshPayloadJson
 import ai.accelera.library.utils.toJsonBytes
 import android.os.Handler
 import android.os.Looper
@@ -56,7 +61,7 @@ internal class AcceleraAttachedContentContext(
         } else {
             mergeJSON(
                 old = data?.let { String(it, Charsets.UTF_8) },
-                new = """{"refresh":true}"""
+                new = refreshPayloadJson()
             )?.toByteArray(Charsets.UTF_8)
         }
 
@@ -87,7 +92,7 @@ internal class AcceleraAttachedContentContext(
 
     fun detach() {
         val meta = (jsonData?.meta as? JSONObject) ?: JSONObject()
-        val payload = mapOf("event" to "close", "meta" to meta)
+        val payload = mapOf(AcceleraJsonKeys.EVENT to AcceleraEvents.CLOSE, AcceleraJsonKeys.META to meta)
         Accelera.shared.logEvent(payload.toJsonBytes())
         remove()
     }
@@ -118,13 +123,19 @@ internal class AcceleraAttachedContentContext(
         try {
             val oldDivView = divView
             val lifecycleOwner = activity as? LifecycleOwner
-            val newDivView = DivKitSetup.makeView(
+
+            // Build the view only when there is something to render. A null result means
+            // no displayable content (already logged) — keep the previous view, don't show
+            // an empty banner.
+            val tag = DivDataTag("accelera_${System.currentTimeMillis()}")
+            val newDivView = DivKitSetup.makeBoundViewOrNull(
                 context = activity,
                 jsonData = loadedData,
+                tag = tag,
                 lifecycleOwner = lifecycleOwner,
                 originContext = this,
                 variableScope = variableScope
-            )
+            ) ?: return
 
             container.addView(
                 newDivView,
@@ -134,12 +145,6 @@ internal class AcceleraAttachedContentContext(
                 )
             )
             container.requestLayout()
-
-            val divData = DivKitSetup.parseDivData(loadedData)
-            if (divData != null) {
-                val tag = DivDataTag("accelera_${System.currentTimeMillis()}")
-                newDivView.setData(divData, tag)
-            }
 
             if (loadedData.closable == true) {
                 addCloseButton(newDivView)
@@ -158,7 +163,6 @@ internal class AcceleraAttachedContentContext(
 
     private fun addCloseButton(divView: Div2View) {
         val activity = divView.context.parentActivity ?: return
-        val density = activity.resources.displayMetrics.density
         val closeButton = CloseButton(activity).apply {
             setOnClickListener { detach() }
         }
@@ -167,11 +171,11 @@ internal class AcceleraAttachedContentContext(
         divView.bringChildToFront(closeButton)
 
         val params = ViewGroup.MarginLayoutParams(
-            (24 * density).toInt(),
-            (24 * density).toInt()
+            activity.dpToPx(AcceleraDimens.CLOSE_BUTTON_SIZE_DP),
+            activity.dpToPx(AcceleraDimens.CLOSE_BUTTON_SIZE_DP)
         ).apply {
-            topMargin = (8 * density).toInt()
-            marginEnd = (8 * density).toInt()
+            topMargin = activity.dpToPx(AcceleraDimens.CONTENT_CLOSE_MARGIN_DP)
+            marginEnd = activity.dpToPx(AcceleraDimens.CONTENT_CLOSE_MARGIN_DP)
         }
         closeButton.layoutParams = params
     }

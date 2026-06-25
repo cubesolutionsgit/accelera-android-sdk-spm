@@ -6,6 +6,9 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
+import ai.accelera.library.core.constants.AcceleraColors
+import ai.accelera.library.core.constants.AcceleraDimens
+import ai.accelera.library.utils.dpToPx
 
 /**
  * Progress bar for stories.
@@ -16,10 +19,8 @@ class StoryProgressBar @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val density = context.resources.displayMetrics.density
-
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.argb(76, 255, 255, 255) // 30% white
+        color = android.graphics.Color.argb(AcceleraColors.PROGRESS_TRACK_ALPHA, 255, 255, 255)
     }
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -35,7 +36,7 @@ class StoryProgressBar @JvmOverloads constructor(
     private var animator: ValueAnimator? = null
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val height = (2 * density).toInt()
+        val height = dpToPx(AcceleraDimens.PROGRESS_BAR_HEIGHT_DP)
         setMeasuredDimension(
             MeasureSpec.getSize(widthMeasureSpec),
             height

@@ -1,5 +1,6 @@
 package ai.accelera.library.banners.presentation.ui
 
+import ai.accelera.library.Accelera
 import ai.accelera.library.banners.infrastructure.animation.StoryEntryAnimator
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
@@ -7,6 +8,8 @@ import ai.accelera.library.banners.infrastructure.gesture.StoryGestureHandler
 import ai.accelera.library.banners.infrastructure.gesture.StoryGestureListener
 import ai.accelera.library.banners.presentation.playback.PlaybackEvent
 import ai.accelera.library.banners.presentation.playback.StoryPlaybackCoordinator
+import ai.accelera.library.core.constants.AcceleraDimens
+import ai.accelera.library.utils.dpToPx
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
@@ -31,18 +34,25 @@ class FullscreenActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        jsonData = intent.getByteArrayExtra("jsonData") ?: return finish()
-        val entryId = intent.getStringExtra("entryId") ?: return finish()
+        jsonData = intent.getByteArrayExtra(EXTRA_JSON_DATA) ?: return finish()
+        val entryId = intent.getStringExtra(EXTRA_ENTRY_ID) ?: return finish()
         scopeToken = intent.getStringExtra(EXTRA_SCOPE_TOKEN)
         variableScope = AcceleraScopeRegistry.get(scopeToken)
 
-        setupUI()
-        setupCoordinator(entryId)
-        setupGestures()
+        // Guard the whole setup chain (DivKit view creation included) so the SDK
+        // never crashes the host app; close the screen on any failure instead.
+        val started = runCatching {
+            setupUI()
+            val opened = setupCoordinator(entryId)
+            if (opened) {
+                setupGestures()
+                rootLayout.post { activityAnimator.animateOpen(rootLayout) {} }
+            }
+            opened
+        }.onFailure { Accelera.shared.error("Failed to open stories: ${it.message}") }
+            .getOrDefault(false)
 
-        rootLayout.post {
-            activityAnimator.animateOpen(rootLayout) {}
-        }
+        if (!started) finish()
     }
 
     private fun setupUI() {
@@ -54,8 +64,8 @@ class FullscreenActivity : AppCompatActivity() {
             )
         }
 
-        val progressBaseTop = (4 * resources.displayMetrics.density).toInt()
-        val closeBaseTop = (24 * resources.displayMetrics.density).toInt()
+        val progressBaseTop = dpToPx(AcceleraDimens.PROGRESS_TOP_MARGIN_DP)
+        val closeBaseTop = dpToPx(AcceleraDimens.FULLSCREEN_CLOSE_TOP_MARGIN_DP)
 
         progressContainer = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -63,8 +73,8 @@ class FullscreenActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
                 topMargin = progressBaseTop
-                marginStart = (8 * resources.displayMetrics.density).toInt()
-                marginEnd = (8 * resources.displayMetrics.density).toInt()
+                marginStart = dpToPx(AcceleraDimens.PROGRESS_SIDE_MARGIN_DP)
+                marginEnd = dpToPx(AcceleraDimens.PROGRESS_SIDE_MARGIN_DP)
             }
             isClickable = false
             isFocusable = false
@@ -74,19 +84,19 @@ class FullscreenActivity : AppCompatActivity() {
         val closeButton = CloseButton(this).apply {
             setOnClickListener { playbackCoordinator.handleEvent(PlaybackEvent.CloseRequested) }
             layoutParams = FrameLayout.LayoutParams(
-                (24 * resources.displayMetrics.density).toInt(),
-                (24 * resources.displayMetrics.density).toInt()
+                dpToPx(AcceleraDimens.CLOSE_BUTTON_SIZE_DP),
+                dpToPx(AcceleraDimens.CLOSE_BUTTON_SIZE_DP)
             ).apply {
                 topMargin = closeBaseTop
-                marginEnd = (16 * resources.displayMetrics.density).toInt()
+                marginEnd = dpToPx(AcceleraDimens.FULLSCREEN_CLOSE_END_MARGIN_DP)
                 gravity = Gravity.TOP or Gravity.END
             }
         }
 
         rootLayout.addView(progressContainer)
         rootLayout.addView(closeButton)
-        progressContainer.elevation = 10f
-        closeButton.elevation = 20f
+        progressContainer.elevation = AcceleraDimens.PROGRESS_CONTAINER_ELEVATION
+        closeButton.elevation = AcceleraDimens.CLOSE_BUTTON_ELEVATION
 
         ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { _, insets ->
             val statusTop = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
@@ -103,7 +113,7 @@ class FullscreenActivity : AppCompatActivity() {
         activityAnimator = StoryEntryAnimator(rootLayout)
     }
 
-    private fun setupCoordinator(entryId: String) {
+    private fun setupCoordinator(entryId: String): Boolean {
         playbackCoordinator = StoryPlaybackCoordinator(
             context = this,
             rootLayout = rootLayout,
@@ -113,9 +123,7 @@ class FullscreenActivity : AppCompatActivity() {
             variableScope = variableScope,
             onCloseRequested = ::closeStories
         )
-        if (!playbackCoordinator.open(entryId)) {
-            finish()
-        }
+        return playbackCoordinator.open(entryId)
     }
 
     private fun setupGestures() {
@@ -153,22 +161,32 @@ class FullscreenActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        playbackCoordinator.handleEvent(PlaybackEvent.ActivityPause)
+        if (::playbackCoordinator.isInitialized) {
+            playbackCoordinator.handleEvent(PlaybackEvent.ActivityPause)
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        playbackCoordinator.handleEvent(PlaybackEvent.ActivityResume)
+        if (::playbackCoordinator.isInitialized) {
+            playbackCoordinator.handleEvent(PlaybackEvent.ActivityResume)
+        }
     }
 
     override fun onDestroy() {
-        playbackCoordinator.handleEvent(PlaybackEvent.Destroyed)
-        gestureHandler.cleanup()
+        if (::playbackCoordinator.isInitialized) {
+            playbackCoordinator.handleEvent(PlaybackEvent.Destroyed)
+        }
+        if (::gestureHandler.isInitialized) {
+            gestureHandler.cleanup()
+        }
         AcceleraScopeRegistry.remove(scopeToken)
         super.onDestroy()
     }
 
     companion object {
+        const val EXTRA_JSON_DATA = "ai.accelera.library.extra.JSON_DATA"
+        const val EXTRA_ENTRY_ID = "ai.accelera.library.extra.ENTRY_ID"
         const val EXTRA_SCOPE_TOKEN = "ai.accelera.library.extra.SCOPE_TOKEN"
     }
 }

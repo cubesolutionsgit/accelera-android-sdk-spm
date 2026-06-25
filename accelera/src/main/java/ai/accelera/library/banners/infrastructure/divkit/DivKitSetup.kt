@@ -88,6 +88,41 @@ internal object DivKitSetup {
      * @param lifecycleOwner LifecycleOwner for managing lifecycle (optional, can be null)
      * @return Configured Div2View instance
      */
+    /**
+     * Returns true when [jsonData] contains content that can actually be rendered.
+     * Use this to decide whether to show a banner at all — an empty placeholder
+     * should never be attached when there is nothing to display.
+     */
+    fun hasDisplayableContent(jsonData: ByteArray): Boolean = parseDivData(jsonData) != null
+
+    /**
+     * Builds a ready-to-show [Div2View] with parsed data already applied.
+     *
+     * Returns null (and logs) when there is no displayable content or when DivKit
+     * view creation throws — so callers can skip rendering instead of attaching an
+     * empty banner or letting an exception reach the host app.
+     */
+    fun makeBoundViewOrNull(
+        context: Context,
+        jsonData: ByteArray,
+        tag: DivDataTag,
+        lifecycleOwner: LifecycleOwner? = null,
+        originContext: AcceleraAttachedContentContext? = null,
+        variableScope: AcceleraDivVariableScope? = null,
+    ): Div2View? {
+        val divData = parseDivData(jsonData) ?: run {
+            Accelera.shared.log("No content to display")
+            return null
+        }
+        return runCatching {
+            val view = makeView(context, jsonData, lifecycleOwner, originContext, variableScope)
+            view.setData(divData, tag)
+            view
+        }.onFailure { e ->
+            Accelera.shared.error("Failed to create DivView: ${e.message}")
+        }.getOrNull()
+    }
+
     fun makeView(
         context: Context,
         jsonData: ByteArray,

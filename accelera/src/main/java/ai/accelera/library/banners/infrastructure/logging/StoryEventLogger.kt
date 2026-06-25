@@ -2,6 +2,8 @@ package ai.accelera.library.banners.infrastructure.logging
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.domain.logging.StoryAnalytics
+import ai.accelera.library.core.constants.AcceleraEvents
+import ai.accelera.library.core.constants.AcceleraJsonKeys
 import ai.accelera.library.utils.toJsonBytes
 import org.json.JSONObject
 
@@ -21,7 +23,7 @@ class StoryEventLogger(
      */
     fun logCardView(card: JSONObject) {
         try {
-            val meta = card.optJSONObject("card")?.optJSONObject("meta") ?: JSONObject()
+            val meta = card.optJSONObject(AcceleraJsonKeys.CARD)?.optJSONObject(AcceleraJsonKeys.META) ?: JSONObject()
             analytics.logCardView(meta)
         } catch (e: Exception) {
             analytics.logError("Error logging view event: ${e.message}")
@@ -30,7 +32,7 @@ class StoryEventLogger(
 
     fun logCardClose(card: JSONObject) {
         try {
-            val meta = card.optJSONObject("card")?.optJSONObject("meta") ?: JSONObject()
+            val meta = card.optJSONObject(AcceleraJsonKeys.CARD)?.optJSONObject(AcceleraJsonKeys.META) ?: JSONObject()
             analytics.logCardClose(meta)
         } catch (e: Exception) {
             analytics.logError("Error logging close event: ${e.message}")
@@ -41,16 +43,16 @@ class StoryEventLogger(
 class AcceleraStoryAnalytics : StoryAnalytics {
     override fun logCardView(meta: JSONObject) {
         val eventPayload = mapOf(
-            "event" to "view",
-            "meta" to meta
+            AcceleraJsonKeys.EVENT to AcceleraEvents.VIEW,
+            AcceleraJsonKeys.META to meta
         )
         Accelera.shared.logEvent(eventPayload.toJsonBytes())
     }
 
     override fun logCardClose(meta: JSONObject) {
         val eventPayload = mapOf(
-            "event" to "close",
-            "meta" to meta
+            AcceleraJsonKeys.EVENT to AcceleraEvents.CLOSE,
+            AcceleraJsonKeys.META to meta
         )
         Accelera.shared.logEvent(eventPayload.toJsonBytes())
     }

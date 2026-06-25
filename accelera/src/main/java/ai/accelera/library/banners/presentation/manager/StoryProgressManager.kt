@@ -7,6 +7,9 @@ import android.os.Looper
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import ai.accelera.library.banners.presentation.ui.StoryProgressBar
+import ai.accelera.library.core.constants.AcceleraDimens
+import ai.accelera.library.core.constants.AcceleraTiming
+import ai.accelera.library.utils.dpToPx
 import org.json.JSONObject
 
 /**
@@ -30,7 +33,7 @@ class StoryProgressManager(
         override fun run() {
             if (!isPaused && currentCardIndex >= 0 && currentCardIndex < progressBars.size) {
                 updateProgress()
-                handler.postDelayed(this, 16) // ~60fps
+                handler.postDelayed(this, AcceleraTiming.PROGRESS_FRAME_INTERVAL_MS) // ~60fps
             }
         }
     }
@@ -62,10 +65,10 @@ class StoryProgressManager(
             val bar = StoryProgressBar(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     0,
-                    (2 * context.resources.displayMetrics.density).toInt(),
+                    context.dpToPx(AcceleraDimens.PROGRESS_BAR_HEIGHT_DP),
                     1f
                 ).apply {
-                    marginEnd = (4 * context.resources.displayMetrics.density).toInt()
+                    marginEnd = context.dpToPx(AcceleraDimens.PROGRESS_BAR_SPACING_DP)
                 }
                 // Don't intercept touch events
                 isClickable = false

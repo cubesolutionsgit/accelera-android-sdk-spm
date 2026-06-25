@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter
 import android.view.View
 import android.view.ViewGroup
 import ai.accelera.library.banners.presentation.ui.StoryCardContainerView
+import ai.accelera.library.core.constants.AcceleraTiming
 
 /**
  * Handles animations for story entry transitions.
@@ -12,7 +13,7 @@ import ai.accelera.library.banners.presentation.ui.StoryCardContainerView
  */
 class StoryEntryAnimator(
     private val rootView: ViewGroup,
-    private val animationDuration: Long = 300L
+    private val animationDuration: Long = AcceleraTiming.ENTRY_ANIMATION_MS
 ) {
     private var isAnimating = false
 

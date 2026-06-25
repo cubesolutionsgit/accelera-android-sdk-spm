@@ -2,10 +2,14 @@ package ai.accelera.library.compose
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
+import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.CloseButton
+import ai.accelera.library.core.constants.AcceleraEvents
+import ai.accelera.library.core.constants.AcceleraJsonKeys
 import ai.accelera.library.utils.closable
 import ai.accelera.library.utils.mergeJSON
 import ai.accelera.library.utils.meta
+import ai.accelera.library.utils.refreshPayloadJson
 import ai.accelera.library.utils.toJsonBytes
 import android.os.Handler
 import android.os.Looper
@@ -34,7 +38,7 @@ fun AcceleraBanner(
         derivedStateOf { data?.toJsonBytes() }
     }
     val baseRequestKey by remember(requestData) {
-        derivedStateOf { requestData?.decodeToString() ?: "__empty_request__" }
+        derivedStateOf { requestData?.decodeToString() ?: EMPTY_REQUEST_KEY }
     }
 
     var refreshIndex by remember { mutableStateOf(0) }
@@ -59,7 +63,10 @@ fun AcceleraBanner(
             val detachAction = {
                 jsonData?.let { currentJsonData ->
                     val meta = (currentJsonData.meta as? JSONObject) ?: JSONObject()
-                    val payload = mapOf("event" to "close", "meta" to meta)
+                    val payload = mapOf(
+                        AcceleraJsonKeys.EVENT to AcceleraEvents.CLOSE,
+                        AcceleraJsonKeys.META to meta
+                    )
                     Accelera.shared.logEvent(payload.toJsonBytes())
                 }
                 jsonData = null
@@ -78,7 +85,7 @@ fun AcceleraBanner(
         } else {
             mergeJSON(
                 old = requestData?.let { String(it, Charsets.UTF_8) },
-                new = """{"refresh":true}"""
+                new = refreshPayloadJson()
             )?.toByteArray(Charsets.UTF_8)
         }
     }
@@ -99,8 +106,11 @@ fun AcceleraBanner(
                     isLoading = false
                 } else {
                     val loadedData = result
-                    if (loadedData != null) {
+                    // Only show the banner when there is actually something to render.
+                    if (loadedData != null && DivKitSetup.hasDisplayableContent(loadedData)) {
                         jsonData = loadedData
+                    } else if (loadedData != null) {
+                        Accelera.shared.log("No content to display")
                     }
                     isLoading = false
                 }
@@ -118,26 +128,31 @@ fun AcceleraBanner(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp),
+                    .height(LOADING_PLACEHOLDER_HEIGHT),
                 contentAlignment = Alignment.Center
             ) {
                 // Empty - can add loading indicator
             }
         } else if (!isDetached && jsonData != null) {
-            AcceleraDivView(
-                jsonData = jsonData!!,
-                modifier = Modifier.fillMaxWidth()
-            )
+            val currentJsonData = jsonData
+            if (currentJsonData != null) {
+                AcceleraDivView(
+                    jsonData = currentJsonData,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             // Close button if closable (using extension property like iOS)
-            val currentJsonData = jsonData
             if (currentJsonData != null && currentJsonData.closable == true) {
                 AndroidView(
                     factory = { ctx ->
                         CloseButton(ctx).apply {
                             setOnClickListener {
                                 val meta = (currentJsonData.meta as? JSONObject) ?: JSONObject()
-                                val payload = mapOf("event" to "close", "meta" to meta)
+                                val payload = mapOf(
+                                    AcceleraJsonKeys.EVENT to AcceleraEvents.CLOSE,
+                                    AcceleraJsonKeys.META to meta
+                                )
                                 Accelera.shared.logEvent(payload.toJsonBytes())
                                 jsonData = null
                                 isDetached = true
@@ -148,7 +163,7 @@ fun AcceleraBanner(
                     },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(CLOSE_BUTTON_PADDING)
                 )
             }
         }
@@ -173,4 +188,13 @@ fun AcceleraStories(
     // The click handling for fullscreen is done via div-action://fullscreen in AcceleraUrlHandler
     AcceleraBanner(data = data, modifier = modifier, controller = controller)
 }
+
+/** Sentinel request key used when no request payload is provided. */
+private const val EMPTY_REQUEST_KEY = "__empty_request__"
+
+/** Height reserved for the banner while content is loading. */
+private val LOADING_PLACEHOLDER_HEIGHT = 100.dp
+
+/** Inset of the overlay close button from the banner's top-end corner. */
+private val CLOSE_BUTTON_PADDING = 8.dp
 

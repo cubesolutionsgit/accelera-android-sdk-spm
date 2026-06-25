@@ -32,3 +32,23 @@ val View.parentActivity: Activity?
  */
 val ViewGroup.parentActivity: Activity?
     get() = context.parentActivity
+
+/**
+ * Converts a dp value to integer pixels using the current display density.
+ */
+fun Context.dpToPx(dp: Number): Int = (dp.toFloat() * resources.displayMetrics.density).toInt()
+
+/**
+ * Converts a dp value to float pixels using the current display density.
+ */
+fun Context.dpToPxF(dp: Number): Float = dp.toFloat() * resources.displayMetrics.density
+
+/**
+ * Converts a dp value to integer pixels using the view's display density.
+ */
+fun View.dpToPx(dp: Number): Int = context.dpToPx(dp)
+
+/**
+ * Converts a dp value to float pixels using the view's display density.
+ */
+fun View.dpToPxF(dp: Number): Float = context.dpToPxF(dp)

@@ -3,6 +3,7 @@ package ai.accelera.library.api
 import ai.accelera.library.AcceleraConfig
 import ai.accelera.library.api.internal.ApiEndpointResolver
 import ai.accelera.library.api.internal.DefaultApiEndpointResolver
+import ai.accelera.library.core.constants.AcceleraHttp
 import ai.accelera.library.networking.HttpClient
 import ai.accelera.library.networking.NetworkError
 import ai.accelera.library.networking.RequestMethod
@@ -25,7 +26,7 @@ class AcceleraAPI(
     ) {
         val headers = mutableMapOf<String, String>()
         config.systemToken?.let {
-            headers["Authorization"] = it
+            headers[AcceleraHttp.HEADER_AUTHORIZATION] = it
         }
 
         // Always use POST for events
@@ -44,7 +45,7 @@ class AcceleraAPI(
     ) {
         val headers = mutableMapOf<String, String>()
         config.systemToken?.let {
-            headers["Authorization"] = it
+            headers[AcceleraHttp.HEADER_AUTHORIZATION] = it
         }
 
         httpClient.execute(

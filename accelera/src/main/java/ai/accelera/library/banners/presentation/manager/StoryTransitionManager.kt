@@ -1,12 +1,14 @@
 package ai.accelera.library.banners.presentation.manager
 
+import ai.accelera.library.core.constants.AcceleraTiming
+
 /**
  * Manages transition state and prevents rapid consecutive transitions.
- * 
+ *
  * Follows Single Responsibility Principle - only handles transition state management.
  */
 class StoryTransitionManager(
-    private val minTransitionDuration: Long = 200L
+    private val minTransitionDuration: Long = AcceleraTiming.TRANSITION_DEBOUNCE_MS
 ) {
     private var isTransitioning = false
     private var transitionStartTime = 0L

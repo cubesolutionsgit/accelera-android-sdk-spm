@@ -7,6 +7,7 @@ import ai.accelera.library.banners.domain.model.StoryViewState
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.StoryCardContainerView
+import ai.accelera.library.core.constants.AcceleraTiming
 import androidx.lifecycle.LifecycleOwner
 
 /**
@@ -246,7 +247,7 @@ class StoryPlaybackCoordinator(
         startProgressAndLog(0)
         repository.cleanupToAdjacent(viewState.entryIds, viewState.currentEntryIndex)
         scheduleAdjacentPreload()
-        handler.postDelayed({ stateMachine.forceState(PlaybackState.ShowingCard) }, 40L)
+        handler.postDelayed({ stateMachine.forceState(PlaybackState.ShowingCard) }, AcceleraTiming.STATE_SETTLE_DELAY_MS)
     }
 
     private fun logCurrentCardClose() {
