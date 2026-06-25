@@ -76,4 +76,41 @@ class AcceleraContentJsonTest {
         assertEquals(true, payload.closable)
         assertEquals("fallback", (payload.meta as JSONObject).getString("campaign"))
     }
+
+    @Test
+    fun `card with states but no log_id gets a generated id`() {
+        val root = JSONObject(
+            """
+            {
+              "card": {
+                "states": [
+                  {"state_id": 0, "div": {"type": "text"}}
+                ]
+              }
+            }
+            """.trimIndent()
+        )
+
+        val divData = root.normalizedDivDataObjectOrNull()
+
+        assertEquals("accelera_generated", divData?.getString("log_id"))
+    }
+
+    @Test
+    fun `card with states and log_id is returned unchanged`() {
+        val root = JSONObject(
+            """
+            {"card": {"log_id": "keep-me", "states": [{"state_id": 0, "div": {"type": "text"}}]}}
+            """.trimIndent()
+        )
+
+        assertEquals("keep-me", root.normalizedDivDataObjectOrNull()?.getString("log_id"))
+    }
+
+    @Test
+    fun `object without states or recognizable div is treated as no content`() {
+        val root = JSONObject("""{"card": {"unrelated": true}}""")
+
+        assertNull(root.normalizedDivDataObjectOrNull())
+    }
 }
