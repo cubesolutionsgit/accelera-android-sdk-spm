@@ -108,3 +108,5 @@ app/build/generated/ksp/
 
 # CI/CD temporary files
 ci-notify.py
+
+/native_realisations
