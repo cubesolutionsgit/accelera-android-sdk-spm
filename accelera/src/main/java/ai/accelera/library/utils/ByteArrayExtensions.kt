@@ -18,7 +18,7 @@ private inline fun <reified T> ByteArray.extractValue(key: String): T? {
     return try {
         val jsonString = String(this, Charsets.UTF_8)
         val jsonObject = JSONObject(jsonString)
-        val root = jsonObject.optJSONObject("card") ?: return null
+        val root = jsonObject.acceleraCardObjectOrNull() ?: return null
         root.opt(key) as? T
     } catch (e: Exception) {
         null

@@ -3,6 +3,7 @@ package ai.accelera.library.banners.infrastructure.divkit
 import android.content.Context
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.AcceleraAttachedContentContext
+import ai.accelera.library.utils.normalizedDivDataObjectOrNull
 import android.view.ContextThemeWrapper
 import androidx.lifecycle.LifecycleOwner
 import com.yandex.div.DivDataTag
@@ -221,10 +222,10 @@ internal object DivKitSetup {
             val jsonString = String(jsonData, Charsets.UTF_8)
             val jsonObject = JSONObject(jsonString)
 
-            // Check if it's a card format: {"card": {"div": {...}}}
-            val divObject = jsonObject.optJSONObject("card")
-                ?.let { card -> card.optJSONObject("div") ?: card }
-                ?: jsonObject
+            val divObject = jsonObject.normalizedDivDataObjectOrNull() ?: run {
+                Accelera.shared.log("No DivKit card data in content response")
+                return null
+            }
 
             val environment = DivParsingEnvironment(ParsingErrorLogger.LOG)
 
