@@ -53,6 +53,9 @@ The library is structured around a singleton `Accelera.shared` entry point.
 Entry point: `AcceleraBanners.attachContentPlaceholder(container: ViewGroup, data: ByteArray?)`.
 It returns `AcceleraContentHandle` with `refresh()` and `detach()`. The singleton also exposes
 container-keyed `refreshContentPlaceholder(container)` / `detachContentPlaceholder(container)`.
+Attached content owns a shared DivKit variable scope. Fullscreen story cards opened from that
+content receive the same `DivVariableController`, so `set_variable` changes propagate back to the
+origin banner scope.
 
 Flow:
 1. Calls `Accelera.shared.getApi().loadBanner()` with merged user info.

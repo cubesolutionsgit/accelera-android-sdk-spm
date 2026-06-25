@@ -2,6 +2,8 @@ package ai.accelera.library.banners.presentation.ui
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTracker
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.utils.closable
 import ai.accelera.library.utils.meta
@@ -18,12 +20,16 @@ import org.json.JSONObject
 class PopupActivity : AppCompatActivity() {
     private lateinit var jsonData: ByteArray
     private var divView: Div2View? = null
+    private var scopeToken: String? = null
+    private var variableScope: AcceleraDivVariableScope? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AcceleraActivityTracker.note(this)
 
         jsonData = intent.getByteArrayExtra(EXTRA_JSON_DATA) ?: return finish()
+        scopeToken = intent.getStringExtra(EXTRA_SCOPE_TOKEN)
+        variableScope = AcceleraScopeRegistry.get(scopeToken)
 
         window.setBackgroundDrawableResource(android.R.color.transparent)
         setupContent()
@@ -39,7 +45,7 @@ class PopupActivity : AppCompatActivity() {
         }
         setContentView(rootLayout)
 
-        val view = DivKitSetup.makeView(this, jsonData, this)
+        val view = DivKitSetup.makeView(this, jsonData, this, variableScope = variableScope)
         divView = view
         rootLayout.addView(
             view,
@@ -93,10 +99,12 @@ class PopupActivity : AppCompatActivity() {
     override fun onDestroy() {
         divView?.let { DivKitSetup.releaseVideoPlayers(it) }
         divView = null
+        AcceleraScopeRegistry.remove(scopeToken)
         super.onDestroy()
     }
 
     companion object {
         const val EXTRA_JSON_DATA = "ai.accelera.library.extra.JSON_DATA"
+        const val EXTRA_SCOPE_TOKEN = "ai.accelera.library.extra.SCOPE_TOKEN"
     }
 }

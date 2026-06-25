@@ -1,6 +1,8 @@
 package ai.accelera.library.banners.presentation.ui
 
 import ai.accelera.library.banners.infrastructure.animation.StoryEntryAnimator
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.infrastructure.gesture.StoryGestureHandler
 import ai.accelera.library.banners.infrastructure.gesture.StoryGestureListener
 import ai.accelera.library.banners.presentation.playback.PlaybackEvent
@@ -23,12 +25,16 @@ class FullscreenActivity : AppCompatActivity() {
     private lateinit var gestureHandler: StoryGestureHandler
     private lateinit var activityAnimator: StoryEntryAnimator
     private lateinit var playbackCoordinator: StoryPlaybackCoordinator
+    private var scopeToken: String? = null
+    private var variableScope: AcceleraDivVariableScope? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         jsonData = intent.getByteArrayExtra("jsonData") ?: return finish()
         val entryId = intent.getStringExtra("entryId") ?: return finish()
+        scopeToken = intent.getStringExtra(EXTRA_SCOPE_TOKEN)
+        variableScope = AcceleraScopeRegistry.get(scopeToken)
 
         setupUI()
         setupCoordinator(entryId)
@@ -104,6 +110,7 @@ class FullscreenActivity : AppCompatActivity() {
             progressContainer = progressContainer,
             jsonData = jsonData,
             lifecycleOwner = this,
+            variableScope = variableScope,
             onCloseRequested = ::closeStories
         )
         if (!playbackCoordinator.open(entryId)) {
@@ -157,7 +164,12 @@ class FullscreenActivity : AppCompatActivity() {
     override fun onDestroy() {
         playbackCoordinator.handleEvent(PlaybackEvent.Destroyed)
         gestureHandler.cleanup()
+        AcceleraScopeRegistry.remove(scopeToken)
         super.onDestroy()
+    }
+
+    companion object {
+        const val EXTRA_SCOPE_TOKEN = "ai.accelera.library.extra.SCOPE_TOKEN"
     }
 }
 

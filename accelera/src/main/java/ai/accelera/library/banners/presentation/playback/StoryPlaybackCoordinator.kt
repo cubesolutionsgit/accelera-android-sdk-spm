@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import ai.accelera.library.banners.domain.model.StoryViewState
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.StoryCardContainerView
 import androidx.lifecycle.LifecycleOwner
@@ -18,7 +19,8 @@ class StoryPlaybackCoordinator(
     private val jsonData: ByteArray,
     private val lifecycleOwner: LifecycleOwner,
     private val onCloseRequested: () -> Unit,
-    dependencies: StoryPlaybackDependencies? = null
+    dependencies: StoryPlaybackDependencies? = null,
+    private val variableScope: AcceleraDivVariableScope? = null
 ) {
     private val deps = dependencies ?: StoryPlaybackDependencyFactory.create(
         context = context,
@@ -26,6 +28,7 @@ class StoryPlaybackCoordinator(
         progressContainer = progressContainer,
         jsonData = jsonData,
         lifecycleOwner = lifecycleOwner,
+        variableScope = variableScope,
         onProgressComplete = { handleEvent(PlaybackEvent.AutoNext) }
     )
     private val handler = deps.handler
@@ -193,7 +196,7 @@ class StoryPlaybackCoordinator(
             entryId = loadedEntry.entryId,
             cards = loadedEntry.cards,
             jsonData = jsonData,
-            makeDivView = { DivKitSetup.makeView(context, jsonData, lifecycleOwner) }
+            makeDivView = { DivKitSetup.makeView(context, jsonData, lifecycleOwner, variableScope = variableScope) }
         )
         return loadedEntry to container
     }

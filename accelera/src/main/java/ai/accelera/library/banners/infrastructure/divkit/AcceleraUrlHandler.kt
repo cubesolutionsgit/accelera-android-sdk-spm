@@ -69,6 +69,9 @@ internal class AcceleraUrlHandler(
                 val intent = Intent(activity, FullscreenActivity::class.java).apply {
                     putExtra("jsonData", jsonData)
                     putExtra("entryId", id)
+                    originContext?.registerSharedVariableScope()?.let { token ->
+                        putExtra(FullscreenActivity.EXTRA_SCOPE_TOKEN, token)
+                    }
                 }
                 activity.startActivity(intent)
                 return true

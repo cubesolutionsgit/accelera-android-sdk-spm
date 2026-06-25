@@ -40,7 +40,8 @@ class EntryViewRepository(
                 cards = cards,
                 entryId = entryId,
                 jsonData = jsonData,
-                cachedViews = cachedViews
+                cachedViews = cachedViews,
+                makeDivView = makeDivView
             )
         } else {
             container.setupCards(cards, entryId, jsonData, makeDivView)

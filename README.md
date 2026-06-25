@@ -196,6 +196,10 @@ Accelera.shared.showPopup(
 )
 ```
 
+#### Общий scope переменных
+
+Для контента, созданного через `attachContentPlaceholder`, SDK использует общий DivKit variable scope между исходным баннером и fullscreen-сторис, открытыми через `div-action://fullscreen`. Поэтому `set_variable` внутри fullscreen обновляет тот же набор переменных, который использует исходный баннер.
+
 #### Параметры компонентов
 
 | Параметр | Тип | Описание |
@@ -280,6 +284,8 @@ AcceleraBanners.showPopup(
 // Или через singleton:
 Accelera.shared.showPopup(this, mapOf("type" to "popup").toJsonBytes())
 ```
+
+Контент, созданный через `attachContentPlaceholder`, получает общий DivKit variable scope с fullscreen-сторис, открытыми из этого же баннера.
 
 #### Параметры `attachContentPlaceholder`
 

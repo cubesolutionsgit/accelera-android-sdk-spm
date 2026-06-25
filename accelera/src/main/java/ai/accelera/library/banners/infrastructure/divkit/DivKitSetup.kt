@@ -92,10 +92,17 @@ internal object DivKitSetup {
         jsonData: ByteArray,
         lifecycleOwner: LifecycleOwner? = null,
         originContext: AcceleraAttachedContentContext? = null,
+        variableScope: AcceleraDivVariableScope? = null,
     ): Div2View {
         val appContext = context.applicationContext ?: context
         val trackingFactory = TrackingPlayerFactory(appContext)
-        val configuration = createConfiguration(context, jsonData, trackingFactory, originContext)
+        val configuration = createConfiguration(
+            context = context,
+            jsonData = jsonData,
+            playerFactory = trackingFactory,
+            originContext = originContext,
+            variableScope = variableScope
+        )
 
         val contextWrapper = when (context) {
             is ContextThemeWrapper -> context
@@ -153,7 +160,8 @@ internal object DivKitSetup {
         context: Context,
         jsonData: ByteArray,
         playerFactory: TrackingPlayerFactory,
-        originContext: AcceleraAttachedContentContext?
+        originContext: AcceleraAttachedContentContext?,
+        variableScope: AcceleraDivVariableScope?
     ): DivConfiguration {
         val appContext = context.applicationContext ?: context
         val imageLoader = GlideDivImageLoader(appContext)
@@ -165,12 +173,17 @@ internal object DivKitSetup {
 
         val lottieExtensionHandler = DivLottieExtensionHandler(lottieRawResProvider)
 
-        return DivConfiguration.Builder(imageLoader)
+        val builder = DivConfiguration.Builder(imageLoader)
             .actionHandler(AcceleraUrlHandler(context, jsonData, originContext))
             .divErrorsReporter(createErrorLogger())
             .extension(lottieExtensionHandler)
             .divPlayerFactory(playerFactory)
-            .build()
+
+        if (variableScope != null) {
+            builder.divVariableController(variableScope.divVariableController)
+        }
+
+        return builder.build()
     }
 
     /**

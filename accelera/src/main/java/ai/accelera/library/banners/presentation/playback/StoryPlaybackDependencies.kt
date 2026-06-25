@@ -2,6 +2,7 @@ package ai.accelera.library.banners.presentation.playback
 
 import ai.accelera.library.banners.data.repository.StoryDataRepository
 import ai.accelera.library.banners.domain.repository.StoryDataSource
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.logging.StoryEventLogger
 import ai.accelera.library.banners.presentation.manager.StoryProgressManager
 import android.content.Context
@@ -33,7 +34,8 @@ object StoryPlaybackDependencyFactory {
         progressContainer: ViewGroup,
         jsonData: ByteArray,
         lifecycleOwner: LifecycleOwner,
-        onProgressComplete: () -> Unit
+        onProgressComplete: () -> Unit,
+        variableScope: AcceleraDivVariableScope? = null
     ): StoryPlaybackDependencies {
         val handler = Handler(Looper.getMainLooper())
         val dataSource = StoryDataRepository(jsonData)
@@ -41,7 +43,14 @@ object StoryPlaybackDependencyFactory {
         val prepareFirstVideoUseCase = DefaultPrepareFirstVideoUseCase(
             repository = repository,
             jsonData = jsonData,
-            makeDivView = { ai.accelera.library.banners.infrastructure.divkit.DivKitSetup.makeView(context, jsonData, lifecycleOwner) }
+            makeDivView = {
+                ai.accelera.library.banners.infrastructure.divkit.DivKitSetup.makeView(
+                    context = context,
+                    jsonData = jsonData,
+                    lifecycleOwner = lifecycleOwner,
+                    variableScope = variableScope
+                )
+            }
         )
         val preloadAdjacent = DefaultPreloadAdjacentEntriesUseCase(
             handler = handler,

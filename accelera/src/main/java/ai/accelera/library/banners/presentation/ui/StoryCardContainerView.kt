@@ -118,7 +118,8 @@ class StoryCardContainerView @JvmOverloads constructor(
         cards: List<JSONObject>,
         entryId: String,
         jsonData: ByteArray,
-        cachedViews: Map<Int, Div2View>
+        cachedViews: Map<Int, Div2View>,
+        makeDivView: () -> Div2View = { DivKitSetup.makeView(context, jsonData) }
     ) {
         this.jsonData = jsonData
         this.entryId = entryId
@@ -139,7 +140,7 @@ class StoryCardContainerView @JvmOverloads constructor(
 
         cards.forEachIndexed { index, card ->
             val isCached = cachedViews.containsKey(index)
-            val divView = cachedViews[index] ?: DivKitSetup.makeView(context, jsonData)
+            val divView = cachedViews[index] ?: makeDivView()
 
             (divView.parent as? ViewGroup)?.removeView(divView)
 

@@ -3,6 +3,8 @@ package ai.accelera.library.banners
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
 import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTracker
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.presentation.ui.PopupActivity
 import ai.accelera.library.utils.parentActivity
 import android.content.Context
@@ -60,10 +62,18 @@ object AcceleraBanners {
             Accelera.shared.error("No activity context available to present popup.")
             return
         }
-        showPopup(activity, data)
+        showPopup(activity, data, variableScope = null)
     }
 
     fun showPopup(context: Context, data: ByteArray? = null) {
+        showPopup(context, data, variableScope = null)
+    }
+
+    private fun showPopup(
+        context: Context,
+        data: ByteArray? = null,
+        variableScope: AcceleraDivVariableScope?
+    ) {
         AcceleraActivityTracker.register(context)
         val activity = context.parentActivity ?: AcceleraActivityTracker.currentActivity()
         if (activity == null) {
@@ -89,6 +99,9 @@ object AcceleraBanners {
 
                 val intent = Intent(activity, PopupActivity::class.java).apply {
                     putExtra(PopupActivity.EXTRA_JSON_DATA, jsonData)
+                    variableScope?.let { scope ->
+                        putExtra(PopupActivity.EXTRA_SCOPE_TOKEN, AcceleraScopeRegistry.register(scope))
+                    }
                 }
                 activity.startActivity(intent)
                 activity.overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)

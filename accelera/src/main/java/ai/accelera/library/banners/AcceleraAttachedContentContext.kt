@@ -3,6 +3,8 @@ package ai.accelera.library.banners
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
 import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTracker
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
+import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.CloseButton
 import ai.accelera.library.utils.closable
@@ -26,6 +28,7 @@ internal class AcceleraAttachedContentContext(
     private val containerRef = WeakReference(container)
     private val loadBannerContentUseCase = DefaultLoadBannerContentUseCase()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val variableScope = AcceleraDivVariableScope()
 
     private var divView: Div2View? = null
     private var jsonData: ByteArray? = null
@@ -100,6 +103,12 @@ internal class AcceleraAttachedContentContext(
         container?.let { AcceleraAttachedContentRegistry.unregister(it) }
     }
 
+    fun sharedVariableScope(): AcceleraDivVariableScope = variableScope
+
+    fun registerSharedVariableScope(): String {
+        return AcceleraScopeRegistry.register(variableScope)
+    }
+
     private fun render(container: ViewGroup, loadedData: ByteArray) {
         val activity = container.parentActivity ?: run {
             Accelera.shared.error("No activity context available to render content.")
@@ -113,7 +122,8 @@ internal class AcceleraAttachedContentContext(
                 context = activity,
                 jsonData = loadedData,
                 lifecycleOwner = lifecycleOwner,
-                originContext = this
+                originContext = this,
+                variableScope = variableScope
             )
 
             container.addView(
