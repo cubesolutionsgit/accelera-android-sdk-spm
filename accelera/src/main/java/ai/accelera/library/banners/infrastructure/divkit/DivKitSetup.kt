@@ -2,6 +2,7 @@ package ai.accelera.library.banners.infrastructure.divkit
 
 import android.content.Context
 import ai.accelera.library.Accelera
+import ai.accelera.library.banners.AcceleraAttachedContentContext
 import android.view.ContextThemeWrapper
 import androidx.lifecycle.LifecycleOwner
 import com.yandex.div.DivDataTag
@@ -90,10 +91,11 @@ internal object DivKitSetup {
         context: Context,
         jsonData: ByteArray,
         lifecycleOwner: LifecycleOwner? = null,
+        originContext: AcceleraAttachedContentContext? = null,
     ): Div2View {
         val appContext = context.applicationContext ?: context
         val trackingFactory = TrackingPlayerFactory(appContext)
-        val configuration = createConfiguration(context, jsonData, trackingFactory)
+        val configuration = createConfiguration(context, jsonData, trackingFactory, originContext)
 
         val contextWrapper = when (context) {
             is ContextThemeWrapper -> context
@@ -150,7 +152,8 @@ internal object DivKitSetup {
     private fun createConfiguration(
         context: Context,
         jsonData: ByteArray,
-        playerFactory: TrackingPlayerFactory
+        playerFactory: TrackingPlayerFactory,
+        originContext: AcceleraAttachedContentContext?
     ): DivConfiguration {
         val appContext = context.applicationContext ?: context
         val imageLoader = GlideDivImageLoader(appContext)
@@ -163,7 +166,7 @@ internal object DivKitSetup {
         val lottieExtensionHandler = DivLottieExtensionHandler(lottieRawResProvider)
 
         return DivConfiguration.Builder(imageLoader)
-            .actionHandler(AcceleraUrlHandler(context, jsonData))
+            .actionHandler(AcceleraUrlHandler(context, jsonData, originContext))
             .divErrorsReporter(createErrorLogger())
             .extension(lottieExtensionHandler)
             .divPlayerFactory(playerFactory)

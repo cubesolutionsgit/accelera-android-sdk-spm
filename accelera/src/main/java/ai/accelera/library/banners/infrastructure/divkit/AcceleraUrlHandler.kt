@@ -1,11 +1,11 @@
 package ai.accelera.library.banners.infrastructure.divkit
 
 import ai.accelera.library.Accelera
+import ai.accelera.library.banners.AcceleraAttachedContentContext
 import ai.accelera.library.banners.presentation.ui.FullscreenActivity
+import ai.accelera.library.utils.parentActivity
 import ai.accelera.library.utils.toJsonBytes
-import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import com.yandex.div.core.DivActionHandler
@@ -14,20 +14,14 @@ import com.yandex.div.json.expressions.ExpressionResolver
 import com.yandex.div2.DivAction
 import org.json.JSONObject
 
-/** Recursively unwraps [ContextWrapper] layers to find the underlying [Activity], if any. */
-private fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
-
 /**
  * URL handler for DivKit actions.
  * Handles div-action:// URLs for fullscreen, link, and close actions.
  */
 internal class AcceleraUrlHandler(
     private val context: Context,
-    private val jsonData: ByteArray
+    private val jsonData: ByteArray,
+    private val originContext: AcceleraAttachedContentContext? = null
 ) : DivActionHandler() {
 
     override fun handleAction(
@@ -59,13 +53,15 @@ internal class AcceleraUrlHandler(
             "meta" to meta
         )
 
-        Accelera.Companion.shared.logEvent(payload.toJsonBytes())
+        if (!uri.queryParameterNames.contains("ignore")) {
+            Accelera.Companion.shared.logEvent(payload.toJsonBytes())
+        }
 
         when (actionType) {
             "fullscreen" -> {
                 val id = uri.getQueryParameter("id") ?: return false
 
-                val activity = context.findActivity() ?: run {
+                val activity = context.parentActivity ?: run {
                     Accelera.Companion.shared.error("No Activity context available to start FullscreenActivity")
                     return false
                 }
@@ -89,7 +85,7 @@ internal class AcceleraUrlHandler(
 
                         // If we're inside FullscreenActivity, ask the delegate whether to close it.
                         // Default is true so standard deep-link navigation is always visible.
-                        val activity = context.findActivity()
+                        val activity = context.parentActivity
                         if (activity is FullscreenActivity) {
                             val shouldDismiss = Accelera.Companion.shared.getDelegate()
                                 ?.shouldDismissStoriesOnLink(finalUrl) ?: true
@@ -105,11 +101,24 @@ internal class AcceleraUrlHandler(
             }
 
             "close" -> {
-                // Close current activity if it's an Activity context
-                if (context is Activity) {
-                    context.finish()
+                val activity = context.parentActivity
+                if (activity is FullscreenActivity) {
+                    activity.requestClose()
                     return true
                 }
+                if (originContext != null) {
+                    originContext.remove()
+                    return true
+                }
+                if (activity != null) {
+                    activity.finish()
+                    return true
+                }
+            }
+
+            "refresh" -> {
+                originContext?.load(isInitialLoad = false)
+                return originContext != null
             }
 
             else -> Unit

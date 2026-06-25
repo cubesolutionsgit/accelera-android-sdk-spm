@@ -79,7 +79,7 @@ afterEvaluate {
 
                 groupId = "com.github.cubesolutionsgit"
                 artifactId = "accelera"
-                version = "0.4.10"
+                version = "0.6.0"
             }
         }
     }

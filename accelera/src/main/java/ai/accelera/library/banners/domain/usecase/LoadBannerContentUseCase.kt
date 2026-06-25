@@ -12,14 +12,16 @@ interface LoadBannerContentUseCase {
     )
 }
 
-class DefaultLoadBannerContentUseCase : LoadBannerContentUseCase {
+class DefaultLoadBannerContentUseCase(
+    private val logViewEvent: Boolean = true
+) : LoadBannerContentUseCase {
     override fun load(
         requestData: ByteArray?,
         completion: (ByteArray?, NetworkError?) -> Unit
     ) {
         val dataWithUserInfo = Accelera.shared.addUserInfo(to = requestData)
         Accelera.shared.getApi().loadBanner(dataWithUserInfo) { result, error ->
-            if (error == null && result != null) {
+            if (logViewEvent && error == null && result != null) {
                 val eventPayload = mapOf(
                     "event" to "view",
                     "meta" to (result.meta ?: emptyMap<String, Any?>())

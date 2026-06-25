@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Accelera SDK** — an Android library (`accelera` module) for integrating dynamic content (banners and stories) into apps using [Yandex DivKit](https://divkit.tech/) for rendering. The `app` module is a minimal demo host.
 
-Current version: `0.4.4`, distributed via JitPack (`com.github.cubesolutionsgit:accelera-android-sdk-spm`).
+Current version: `0.6.0`, distributed via JitPack (`com.github.cubesolutionsgit:accelera-android-sdk-spm`).
 
 ## Build Commands
 
@@ -51,6 +51,8 @@ The library is structured around a singleton `Accelera.shared` entry point.
 
 ### Banners Module (`ai.accelera.library.banners`)
 Entry point: `AcceleraBanners.attachContentPlaceholder(container: ViewGroup, data: ByteArray?)`.
+It returns `AcceleraContentHandle` with `refresh()` and `detach()`. The singleton also exposes
+container-keyed `refreshContentPlaceholder(container)` / `detachContentPlaceholder(container)`.
 
 Flow:
 1. Calls `Accelera.shared.getApi().loadBanner()` with merged user info.
@@ -61,7 +63,7 @@ Flow:
 
 DivKit integration (`banners/infrastructure/divkit`):
 - `DivKitSetup` — creates `Div2Context` + `DivConfiguration` with Glide image loader, Lottie extension, ExoPlayer factory, and `AcceleraUrlHandler`.
-- `AcceleraUrlHandler` — handles `div-action://` URIs: `fullscreen` (launches `FullscreenActivity`), `link` (delegates to `AcceleraDelegate.handleUrl`), `close` (finishes activity).
+- `AcceleraUrlHandler` — handles `div-action://` URIs: `fullscreen` (launches `FullscreenActivity`), `link` (delegates to `AcceleraDelegate.handleUrl`), `refresh` (reloads attached content), `close` (finishes fullscreen/popup or removes attached content). `ignore` query key skips server event logging.
 
 Stories fullscreen (`banners/presentation/ui/FullscreenActivity`):
 - Launched with `jsonData: ByteArray` + `entryId: String` extras.
@@ -82,4 +84,4 @@ Stories fullscreen (`banners/presentation/ui/FullscreenActivity`):
 - User info is merged into every outgoing request payload via `Accelera.shared.addUserInfo(to:)`.
 - The API instance is created lazily and reset on `configure()`. Custom API from delegate takes priority over `AcceleraAPI`.
 - Log messages are buffered before a delegate is set and flushed when one is attached.
-- `FullscreenActivity` must be declared in the consuming app's `AndroidManifest.xml` (the library's manifest declares it under the `ai.accelera.library` namespace).
+- `FullscreenActivity` and `PopupActivity` must be declared in the consuming app's `AndroidManifest.xml` (the library manifest declares both under the `ai.accelera.library` namespace).

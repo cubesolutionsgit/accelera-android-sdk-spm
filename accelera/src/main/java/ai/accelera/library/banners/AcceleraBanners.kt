@@ -1,22 +1,18 @@
 package ai.accelera.library.banners
 
 import ai.accelera.library.Accelera
-import ai.accelera.library.utils.closable
-import ai.accelera.library.utils.meta
-import ai.accelera.library.utils.parentActivity
-import ai.accelera.library.utils.toJsonBytes
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
-import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
-import ai.accelera.library.banners.presentation.ui.CloseButton
+import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTracker
+import ai.accelera.library.banners.presentation.ui.PopupActivity
+import ai.accelera.library.utils.parentActivity
+import android.content.Context
+import android.content.Intent
 import android.view.ViewGroup
-import org.json.JSONObject
 
 /**
  * Extension functions for Accelera banners module (similar to Accelera+Banners in iOS).
  */
 object AcceleraBanners {
-    private val loadBannerContentUseCase = DefaultLoadBannerContentUseCase()
-
     /**
      * Loads and attaches dynamic content into the given container.
      *
@@ -33,82 +29,69 @@ object AcceleraBanners {
     fun attachContentPlaceholder(
         container: ViewGroup,
         data: ByteArray? = null
-    ) {
-        // Clear previous views
-        container.removeAllViews()
+    ): AcceleraContentHandle {
+        val context = AcceleraAttachedContentContext(container, data)
+        AcceleraAttachedContentRegistry.register(container, context)
+        context.load(isInitialLoad = true)
+        return AcceleraContentHandle(context)
+    }
 
-        val activity = container.parentActivity
-        if (activity == null) {
-            Accelera.shared.error("No activity context available to present from.")
+    fun refreshContentPlaceholder(container: ViewGroup) {
+        val context = AcceleraAttachedContentRegistry.get(container)
+        if (context == null) {
+            Accelera.shared.log("No content placeholder found to refresh")
             return
         }
+        context.load(isInitialLoad = false)
+    }
+
+    fun detachContentPlaceholder(container: ViewGroup) {
+        val context = AcceleraAttachedContentRegistry.get(container)
+        if (context == null) {
+            Accelera.shared.log("No content placeholder found to detach")
+            return
+        }
+        context.detach()
+    }
+
+    fun showPopup(data: ByteArray? = null) {
+        val activity = AcceleraActivityTracker.currentActivity()
+        if (activity == null) {
+            Accelera.shared.error("No activity context available to present popup.")
+            return
+        }
+        showPopup(activity, data)
+    }
+
+    fun showPopup(context: Context, data: ByteArray? = null) {
+        AcceleraActivityTracker.register(context)
+        val activity = context.parentActivity ?: AcceleraActivityTracker.currentActivity()
+        if (activity == null) {
+            Accelera.shared.error("No activity context available to present popup.")
+            return
+        }
+        AcceleraActivityTracker.note(activity)
 
         val paramsString = data?.let { String(it, Charsets.UTF_8) } ?: "<invalid>"
-        Accelera.shared.log("Loading content with params: $paramsString")
+        Accelera.shared.log("Loading popup content with params: $paramsString")
 
-        loadBannerContentUseCase.load(data) { result, error ->
+        DefaultLoadBannerContentUseCase(logViewEvent = false).load(data) { result, error ->
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 if (error != null) {
-                    Accelera.shared.error("Failed to load content: ${error}")
+                    Accelera.shared.error("Failed to load popup content: $error")
                     return@post
                 }
 
                 val jsonData = result ?: run {
-                    Accelera.shared.error("Empty JSON data from API")
+                    Accelera.shared.error("Empty popup JSON data from API")
                     return@post
                 }
 
-                Accelera.shared.log("Content loaded")
-
-                try {
-                    // Activity may implement LifecycleOwner (AppCompatActivity does)
-                    val lifecycleOwner = activity as? androidx.lifecycle.LifecycleOwner
-                    val divView = DivKitSetup.makeView(activity, jsonData, lifecycleOwner)
-                    
-                    container.addView(divView)
-                    
-                    // Set constraints similar to iOS NSLayoutConstraint
-                    divView.layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    
-                    container.requestLayout()
-
-                    // Set source asynchronously (similar to iOS Task { await divView.setSource(source) })
-                    val divData = DivKitSetup.parseDivData(jsonData)
-                    if (divData != null) {
-                        val tag = com.yandex.div.DivDataTag("accelera_${System.currentTimeMillis()}")
-                        divView.setData(divData, tag)
-                    }
-
-                    // Add close button if closable (similar to iOS: if jsonData.closable == true)
-                    if (jsonData.closable == true) {
-                        val closeButton = CloseButton(activity).apply {
-                            setOnClickListener {
-                                val meta = (jsonData.meta as? JSONObject) ?: JSONObject()
-                                val payload = mapOf("event" to "close", "meta" to meta)
-                                Accelera.shared.logEvent(payload.toJsonBytes())
-                                container.removeView(divView)
-                            }
-                        }
-                        
-                        divView.addView(closeButton)
-                        divView.bringChildToFront(closeButton)
-                        
-                        // Set constraints (similar to iOS NSLayoutConstraint)
-                        val params = ViewGroup.MarginLayoutParams(
-                            (24 * activity.resources.displayMetrics.density).toInt(),
-                            (24 * activity.resources.displayMetrics.density).toInt()
-                        ).apply {
-                            topMargin = (8 * activity.resources.displayMetrics.density).toInt()
-                            marginEnd = (8 * activity.resources.displayMetrics.density).toInt()
-                        }
-                        closeButton.layoutParams = params
-                    }
-                } catch (e: Exception) {
-                    Accelera.shared.error("Failed to create DivView: ${e.message}")
+                val intent = Intent(activity, PopupActivity::class.java).apply {
+                    putExtra(PopupActivity.EXTRA_JSON_DATA, jsonData)
                 }
+                activity.startActivity(intent)
+                activity.overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
             }
         }
     }

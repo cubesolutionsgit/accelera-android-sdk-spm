@@ -31,7 +31,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts (app)
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.4.10")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.0")
 }
 ```
 
@@ -141,6 +141,7 @@ Accelera.shared.setUserInfo(
 
 ```kotlin
 import ai.accelera.library.compose.AcceleraBanner
+import ai.accelera.library.compose.rememberAcceleraBannerController
 import ai.accelera.library.compose.AcceleraStories
 
 LazyColumn {
@@ -167,6 +168,33 @@ LazyColumn {
 ```
 
 > **Важно:** используйте стабильный `key` для каждого item в `LazyColumn` — это гарантирует корректное восстановление состояния при прокрутке.
+
+#### Управление баннером в Compose
+
+```kotlin
+val bannerController = rememberAcceleraBannerController()
+
+AcceleraBanner(
+    data = mapOf("type" to "banner", "slot" to "messages_top_banner"),
+    controller = bannerController,
+    modifier = Modifier.fillMaxWidth()
+)
+
+// Перезагрузить с исходными параметрами + {"refresh": true}
+bannerController.refresh()
+
+// Удалить текущий баннер и отправить close-event
+bannerController.detach()
+```
+
+Popup открывается из Compose тем же Activity-based API:
+
+```kotlin
+Accelera.shared.showPopup(
+    context = LocalContext.current,
+    data = mapOf("type" to "popup", "slot" to "promo").toJsonBytes()
+)
+```
 
 #### Параметры компонентов
 
@@ -215,6 +243,44 @@ AcceleraBanners.attachContentPlaceholder(
 )
 ```
 
+`attachContentPlaceholder` возвращает `AcceleraContentHandle`:
+
+```kotlin
+val handle = AcceleraBanners.attachContentPlaceholder(
+    container = bannerContainer,
+    data = mapOf("type" to "banner", "slot" to "messages_top_banner").toJsonBytes()
+)
+
+// Перезагрузить с исходными параметрами + {"refresh": true}
+handle.refresh()
+
+// Удалить текущий контент и отправить close-event
+handle.detach()
+```
+
+Если handle не сохранён, используйте container-keyed API:
+
+```kotlin
+AcceleraBanners.refreshContentPlaceholder(bannerContainer)
+AcceleraBanners.detachContentPlaceholder(bannerContainer)
+
+// То же доступно через singleton:
+Accelera.shared.refreshContentPlaceholder(bannerContainer)
+Accelera.shared.detachContentPlaceholder(bannerContainer)
+```
+
+Popup:
+
+```kotlin
+AcceleraBanners.showPopup(
+    context = this,
+    data = mapOf("type" to "popup", "slot" to "promo").toJsonBytes()
+)
+
+// Или через singleton:
+Accelera.shared.showPopup(this, mapOf("type" to "popup").toJsonBytes())
+```
+
 #### Параметры `attachContentPlaceholder`
 
 | Параметр | Тип | Описание |
@@ -252,8 +318,16 @@ Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
 |-----|-----------|
 | `div-action://fullscreen?id=<entryId>` | Открывает `FullscreenActivity` со сторис |
 | `div-action://link?url=<url>` | Передаёт URL в `delegate.handleUrl()` |
-| `div-action://close` | Закрывает текущий экран (только внутри `FullscreenActivity`) |
+| `div-action://refresh` | Перезагружает attached placeholder с `{"refresh": true}` |
+| `div-action://close` | Закрывает текущий fullscreen/popup или удаляет attached placeholder |
 | `div-action://<custom>` | Передаётся в `delegate.action()` |
+
+Добавьте query-параметр `ignore`, если действие должно выполниться локально, но не должно отправляться в `/api/v1/events`:
+
+```text
+div-action://refresh?ignore
+div-action://close?ignore=false
+```
 
 ---
 
@@ -325,20 +399,24 @@ Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
 
 ## Требования
 
-- Android minSdk **21**
+- Android minSdk **24**
 - Kotlin **1.9+**
 - Jetpack Compose BOM **2024.01+** (для Compose-компонентов)
-- Добавьте `FullscreenActivity` в `AndroidManifest.xml` вашего приложения:
+- Добавьте `FullscreenActivity` и `PopupActivity` в `AndroidManifest.xml` вашего приложения:
 
 ```xml
 <activity
     android:name="ai.accelera.library.banners.presentation.ui.FullscreenActivity"
     android:theme="@style/Theme.AppCompat.NoActionBar" />
+
+<activity
+    android:name="ai.accelera.library.banners.presentation.ui.PopupActivity"
+    android:theme="@style/Theme.Accelera.Popup" />
 ```
 
 ---
 
-📄 Версия: `0.4.9`
-📆 Обновлено: март 2026
+📄 Версия: `0.6.0`
+📆 Обновлено: июнь 2026
 📫 Поддержка: [@cubesolutionsgit](https://github.com/cubesolutionsgit)
 🔗 Репозиторий: [accelera-android-sdk-spm](https://github.com/cubesolutionsgit/accelera-android-sdk-spm)

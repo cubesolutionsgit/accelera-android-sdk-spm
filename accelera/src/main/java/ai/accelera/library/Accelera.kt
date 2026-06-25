@@ -1,8 +1,11 @@
 package ai.accelera.library
 
 import ai.accelera.library.api.AcceleraAPIProtocol
+import ai.accelera.library.banners.AcceleraBanners
 import ai.accelera.library.core.api.DefaultApiProvider
 import ai.accelera.library.core.di.InternalModule
+import android.content.Context
+import android.view.ViewGroup
 import kotlinx.serialization.json.Json
 
 /**
@@ -124,6 +127,22 @@ class Accelera private constructor() {
     internal fun handleUrl(url: android.net.Uri) {
         log("Handling URL: $url")
         delegate?.handleUrl(url)
+    }
+
+    fun refreshContentPlaceholder(container: ViewGroup) {
+        AcceleraBanners.refreshContentPlaceholder(container)
+    }
+
+    fun detachContentPlaceholder(container: ViewGroup) {
+        AcceleraBanners.detachContentPlaceholder(container)
+    }
+
+    fun showPopup(data: ByteArray? = null) {
+        AcceleraBanners.showPopup(data)
+    }
+
+    fun showPopup(context: Context, data: ByteArray? = null) {
+        AcceleraBanners.showPopup(context, data)
     }
 
     internal fun getApi(): AcceleraAPIProtocol {

@@ -7,6 +7,10 @@
             android:name="ai.accelera.library.banners.presentation.ui.FullscreenActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="false" />
+        <activity
+            android:name="ai.accelera.library.banners.presentation.ui.PopupActivity"
+            android:theme="@style/Theme.Accelera.Popup"
+            android:exported="false" />
     </application>
 </manifest>
 
