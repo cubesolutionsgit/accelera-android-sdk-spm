@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.launch
@@ -32,6 +33,7 @@ fun DemoApp() {
         )
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    val saveableStateHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
 
     DisposableEffect(snackbarHostState) {
@@ -46,7 +48,12 @@ fun DemoApp() {
         onTabSelected = { selectedTab = it },
         snackbarHostState = snackbarHostState,
         configState = configState,
-        onConfigStateChange = { configState = it }
+        onConfigStateChange = { configState = it },
+        content = { tabContent ->
+            saveableStateHolder.SaveableStateProvider(selectedTab) {
+                tabContent()
+            }
+        }
     )
 }
 
@@ -56,7 +63,8 @@ private fun DemoScaffold(
     onTabSelected: (DemoTab) -> Unit,
     snackbarHostState: SnackbarHostState,
     configState: DemoConfigState,
-    onConfigStateChange: (DemoConfigState) -> Unit
+    onConfigStateChange: (DemoConfigState) -> Unit,
+    content: @Composable (@Composable () -> Unit) -> Unit = { it() }
 ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -79,29 +87,31 @@ private fun DemoScaffold(
         }
     ) { innerPadding ->
         val contentModifier = Modifier.padding(innerPadding)
-        when (selectedTab) {
-            DemoTab.Home -> HomeTab(
-                modifier = contentModifier,
-                configState = configState,
-                onConfigStateChange = onConfigStateChange,
-                showError = DemoEvents::error
-            )
+        content {
+            when (selectedTab) {
+                DemoTab.Home -> HomeTab(
+                    modifier = contentModifier,
+                    configState = configState,
+                    onConfigStateChange = onConfigStateChange,
+                    showError = DemoEvents::error
+                )
 
-            DemoTab.Log -> LogTab(
-                entries = DemoEvents.logEntries,
-                onClear = DemoEvents::clear,
-                modifier = contentModifier
-            )
+                DemoTab.Log -> LogTab(
+                    entries = DemoEvents.logEntries,
+                    onClear = DemoEvents::clear,
+                    modifier = contentModifier
+                )
 
-            DemoTab.Compose -> ComposeTab(
-                modifier = contentModifier,
-                showError = DemoEvents::error
-            )
+                DemoTab.Compose -> ComposeTab(
+                    modifier = contentModifier,
+                    showError = DemoEvents::error
+                )
 
-            DemoTab.Stress -> StressTab(
-                modifier = contentModifier,
-                showError = DemoEvents::error
-            )
+                DemoTab.Stress -> StressTab(
+                    modifier = contentModifier,
+                    showError = DemoEvents::error
+                )
+            }
         }
     }
 }

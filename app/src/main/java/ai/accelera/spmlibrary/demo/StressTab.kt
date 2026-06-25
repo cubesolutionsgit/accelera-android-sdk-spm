@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,11 +32,12 @@ internal fun StressTab(
     modifier: Modifier,
     showError: (String) -> Unit
 ) {
+    val listState = rememberLazyListState()
     var container by remember { mutableStateOf<ViewGroup?>(null) }
     var handle by remember { mutableStateOf<AcceleraContentHandle?>(null) }
-    var running by remember { mutableStateOf(false) }
-    var cycle by remember { mutableIntStateOf(0) }
-    var stressData by remember { mutableStateOf(defaultBannerJson) }
+    var running by rememberSaveable { mutableStateOf(false) }
+    var cycle by rememberSaveable { mutableIntStateOf(0) }
+    var stressData by rememberSaveable { mutableStateOf(defaultBannerJson) }
 
     LaunchedEffect(running, container, stressData) {
         if (!running) return@LaunchedEffect
@@ -73,6 +76,7 @@ internal fun StressTab(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -151,4 +155,3 @@ private fun StressCardPreview() {
         )
     }
 }
-

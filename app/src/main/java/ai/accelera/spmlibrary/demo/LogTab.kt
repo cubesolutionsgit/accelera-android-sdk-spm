@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +49,9 @@ internal fun LogTab(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    var query by remember { mutableStateOf("") }
-    var selectedLevel by remember { mutableStateOf(DemoLogLevel.All) }
+    val listState = rememberLazyListState()
+    var query by rememberSaveable { mutableStateOf("") }
+    var selectedLevel by rememberSaveable { mutableStateOf(DemoLogLevel.All) }
     var pendingExportText by remember { mutableStateOf<String?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/plain")
@@ -67,16 +70,15 @@ internal fun LogTab(
             }
         }
     }
-    val filteredEntries = remember(entries, query, selectedLevel) {
-        entries.filter { entry ->
-            val matchesLevel = selectedLevel == DemoLogLevel.All || entry.level == selectedLevel
-            val matchesQuery = query.isBlank() || entry.text.contains(query, ignoreCase = true)
-            matchesLevel && matchesQuery
-        }
+    val filteredEntries = entries.filter { entry ->
+        val matchesLevel = selectedLevel == DemoLogLevel.All || entry.level == selectedLevel
+        val matchesQuery = query.isBlank() || entry.text.contains(query, ignoreCase = true)
+        matchesLevel && matchesQuery
     }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {

@@ -22,9 +22,13 @@ internal const val defaultBannerJson = """
 
 internal const val defaultPopupJson = """
 {
-  "type": "popup",
-  "slot": "main_popup",
-  "channel": "dev"
+  "slot": "main_top_stories",
+  "channel": "dev",
+  "userInfo": {
+    "client_id": "asd",
+    "language": "KZ"
+  },
+  "type": "popup"
 }
 """
 
@@ -43,6 +47,7 @@ internal fun configureAccelera(url: String, token: String) {
             systemToken = token
         )
     )
+    Accelera.shared.setNetworkLoggingEnabled(true)
 }
 
 internal fun validateJson(text: String, showError: (String) -> Unit): ByteArray? {
@@ -52,6 +57,12 @@ internal fun validateJson(text: String, showError: (String) -> Unit): ByteArray?
         showError("Invalid JSON: ${error.message}")
         null
     }
+}
+
+internal fun jsonBytesOrNull(text: String): ByteArray? {
+    return runCatching {
+        JSONObject(text).toString().toByteArray(Charsets.UTF_8)
+    }.getOrNull()
 }
 
 internal fun jsonToMapOrNull(text: String): Map<String, Any?>? {
@@ -74,4 +85,3 @@ private fun JSONObject.toMap(): Map<String, Any?> {
     }
     return result
 }
-

@@ -15,6 +15,7 @@ class BufferedDelegateLogger(
         Looper.getMainLooper()?.let { Handler(it) }
     }.getOrNull()
 ) : AcceleraLogger {
+    private val maxBufferedMessages = 100
     private val logBuffer = mutableListOf<String>()
     @Volatile
     private var delegate: AcceleraDelegate? = null
@@ -38,12 +39,29 @@ class BufferedDelegateLogger(
     }
 
     override fun log(message: String) {
-        synchronized(logBuffer) { logBuffer.add(message) }
-        delegate?.log(message)
+        val currentDelegate = delegate
+        if (currentDelegate == null) {
+            buffer(message)
+        } else {
+            currentDelegate.log(message)
+        }
     }
 
     override fun error(message: String) {
-        synchronized(logBuffer) { logBuffer.add(message) }
-        delegate?.error(message)
+        val currentDelegate = delegate
+        if (currentDelegate == null) {
+            buffer(message)
+        } else {
+            currentDelegate.error(message)
+        }
+    }
+
+    private fun buffer(message: String) {
+        synchronized(logBuffer) {
+            logBuffer.add(message)
+            while (logBuffer.size > maxBufferedMessages) {
+                logBuffer.removeAt(0)
+            }
+        }
     }
 }

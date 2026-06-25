@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -21,9 +22,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -38,12 +41,15 @@ internal fun HomeTab(
     showError: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var apiUrl by remember { mutableStateOf(configState.appliedUrl.ifBlank { BuildConfig.ACCELERA_URL }) }
-    var token by remember { mutableStateOf(configState.appliedToken.ifBlank { BuildConfig.ACCELERA_TOKEN }) }
-    var userInfo by remember { mutableStateOf(defaultUserInfoJson) }
-    var storiesData by remember { mutableStateOf(defaultStoriesJson) }
-    var bannerData by remember { mutableStateOf(defaultBannerJson) }
-    var popupData by remember { mutableStateOf(defaultPopupJson) }
+    val listState = rememberLazyListState()
+    var apiUrl by rememberSaveable { mutableStateOf(configState.appliedUrl.ifBlank { BuildConfig.ACCELERA_URL }) }
+    var token by rememberSaveable { mutableStateOf(configState.appliedToken.ifBlank { BuildConfig.ACCELERA_TOKEN }) }
+    var userInfo by rememberSaveable { mutableStateOf(defaultUserInfoJson) }
+    var storiesData by rememberSaveable { mutableStateOf(defaultStoriesJson) }
+    var bannerData by rememberSaveable { mutableStateOf(defaultBannerJson) }
+    var popupData by rememberSaveable { mutableStateOf(defaultPopupJson) }
+    var storiesAttached by rememberSaveable { mutableStateOf(false) }
+    var bannerAttached by rememberSaveable { mutableStateOf(false) }
 
     var storiesContainer by remember { mutableStateOf<ViewGroup?>(null) }
     var bannerContainer by remember { mutableStateOf<ViewGroup?>(null) }
@@ -52,8 +58,27 @@ internal fun HomeTab(
     val configDirty = apiUrl != configState.appliedUrl || token != configState.appliedToken
     val userInfoDirty = userInfo != configState.appliedUserInfo
 
+    LaunchedEffect(storiesContainer, storiesAttached, storiesData, configState.isConfigured) {
+        val container = storiesContainer
+        if (storiesAttached && storiesHandle == null && container != null && configState.isConfigured) {
+            jsonBytesOrNull(storiesData)?.let { data ->
+                storiesHandle = AcceleraBanners.attachContentPlaceholder(container, data)
+            }
+        }
+    }
+
+    LaunchedEffect(bannerContainer, bannerAttached, bannerData, configState.isConfigured) {
+        val container = bannerContainer
+        if (bannerAttached && bannerHandle == null && container != null && configState.isConfigured) {
+            jsonBytesOrNull(bannerData)?.let { data ->
+                bannerHandle = AcceleraBanners.attachContentPlaceholder(container, data)
+            }
+        }
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -117,14 +142,19 @@ internal fun HomeTab(
                                 showError("Stories container is not ready")
                             } else {
                                 storiesHandle = AcceleraBanners.attachContentPlaceholder(container, data)
+                                storiesAttached = true
                                 DemoEvents.log("attach stories placeholder")
                             }
                         }
                     },
                     secondary = "Refresh" to { storiesHandle?.refresh() ?: showError("No stories handle") },
-                    tertiary = "Detach" to { storiesHandle?.detach() ?: showError("No stories handle") }
+                    tertiary = "Detach" to {
+                        storiesAttached = false
+                        storiesHandle?.detach() ?: showError("No stories handle")
+                        storiesHandle = null
+                    }
                 )
-                PlaceholderBox { storiesContainer = it }
+                PlaceholderBox { container -> storiesContainer = container }
 
                 HorizontalDivider()
 
@@ -142,12 +172,17 @@ internal fun HomeTab(
                                 showError("Banner container is not ready")
                             } else {
                                 bannerHandle = AcceleraBanners.attachContentPlaceholder(container, data)
+                                bannerAttached = true
                                 DemoEvents.log("attach banner placeholder")
                             }
                         }
                     },
                     secondary = "Refresh" to { bannerHandle?.refresh() ?: showError("No banner handle") },
-                    tertiary = "Detach" to { bannerHandle?.detach() ?: showError("No banner handle") }
+                    tertiary = "Detach" to {
+                        bannerAttached = false
+                        bannerHandle?.detach() ?: showError("No banner handle")
+                        bannerHandle = null
+                    }
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
@@ -162,14 +197,20 @@ internal fun HomeTab(
                     OutlinedButton(
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            bannerContainer?.let(Accelera.shared::detachContentPlaceholder)
-                                ?: showError("Banner container is not ready")
+                            val container = bannerContainer
+                            if (container == null) {
+                                showError("Banner container is not ready")
+                            } else {
+                                bannerAttached = false
+                                Accelera.shared.detachContentPlaceholder(container)
+                                bannerHandle = null
+                            }
                         }
                     ) {
                         Text("Detach by container")
                     }
                 }
-                PlaceholderBox { bannerContainer = it }
+                PlaceholderBox { container -> bannerContainer = container }
             }
         }
 

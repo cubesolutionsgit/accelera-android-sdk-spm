@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,8 +31,9 @@ internal fun ComposeTab(
     modifier: Modifier,
     showError: (String) -> Unit
 ) {
-    var storiesData by remember { mutableStateOf(defaultStoriesJson) }
-    var bannerData by remember { mutableStateOf(defaultBannerJson) }
+    val listState = rememberLazyListState()
+    var storiesData by rememberSaveable { mutableStateOf(defaultStoriesJson) }
+    var bannerData by rememberSaveable { mutableStateOf(defaultBannerJson) }
     val bannerController = rememberAcceleraBannerController()
 
     val storiesMap = remember(storiesData) { jsonToMapOrNull(storiesData) }
@@ -38,6 +41,7 @@ internal fun ComposeTab(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -101,4 +105,3 @@ private fun ComposeControlsPreview() {
         }
     }
 }
-

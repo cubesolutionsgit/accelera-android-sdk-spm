@@ -30,6 +30,9 @@ class Accelera private constructor() {
     @Volatile
     private var api: AcceleraAPIProtocol? = null
 
+    @Volatile
+    private var networkLoggingEnabled: Boolean = false
+
     /**
      * Gets the current delegate.
      * @return Current delegate or null if not set
@@ -46,6 +49,21 @@ class Accelera private constructor() {
         delegate = newDelegate
         internalModule.logger.setDelegate(newDelegate)
     }
+
+    /**
+     * Enables or disables verbose HTTP request/response logging.
+     *
+     * Disabled by default for SDK integrations because requests may contain
+     * tokens and user payloads. Demo applications can enable it explicitly.
+     */
+    fun setNetworkLoggingEnabled(enabled: Boolean) {
+        networkLoggingEnabled = enabled
+        if (enabled) {
+            log("Network HTTP logging enabled")
+        }
+    }
+
+    internal fun isNetworkLoggingEnabled(): Boolean = networkLoggingEnabled
 
     /**
      * Configures the library with the provided configuration.
