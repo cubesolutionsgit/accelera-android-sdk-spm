@@ -2,6 +2,7 @@ package ai.accelera.spmlibrary.demo
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Code
@@ -39,6 +40,8 @@ enum class DemoLogLevel {
 }
 
 object DemoEvents {
+    private const val TAG = "AcceleraDemo"
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val nextId = AtomicLong()
 
@@ -52,6 +55,10 @@ object DemoEvents {
             level = level,
             text = "$timestamp  $message"
         )
+        when (level) {
+            DemoLogLevel.Error -> Log.e(TAG, message)
+            else -> Log.i(TAG, message)
+        }
         mainHandler.post {
             logEntries.add(entry)
             while (logEntries.size > 200) logEntries.removeAt(0)
