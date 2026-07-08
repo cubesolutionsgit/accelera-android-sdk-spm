@@ -32,7 +32,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts (app)
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.0")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.1")
 }
 ```
 
