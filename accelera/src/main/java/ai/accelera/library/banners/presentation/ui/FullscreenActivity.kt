@@ -2,6 +2,9 @@ package ai.accelera.library.banners.presentation.ui
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.infrastructure.animation.StoryEntryAnimator
+import ai.accelera.library.banners.domain.model.StoryPlaybackSnapshot
+import ai.accelera.library.banners.infrastructure.cache.AcceleraPayloadRegistry
+import ai.accelera.library.banners.infrastructure.cache.StoryPlaybackStateStore
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.infrastructure.gesture.StoryGestureHandler
@@ -29,13 +32,22 @@ class FullscreenActivity : AppCompatActivity() {
     private lateinit var activityAnimator: StoryEntryAnimator
     private lateinit var playbackCoordinator: StoryPlaybackCoordinator
     private var scopeToken: String? = null
+    private var payloadToken: String? = null
     private var variableScope: AcceleraDivVariableScope? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        jsonData = intent.getByteArrayExtra(EXTRA_JSON_DATA) ?: return finish()
-        val entryId = intent.getStringExtra(EXTRA_ENTRY_ID) ?: return finish()
+        payloadToken = intent.getStringExtra(EXTRA_PAYLOAD_TOKEN)
+        jsonData = AcceleraPayloadRegistry.get(payloadToken)
+            ?: intent.getByteArrayExtra(EXTRA_JSON_DATA)
+            ?: return finish()
+        // On recreation (rotation etc.) resume at the entry/card/timer position
+        // captured in onDestroy instead of restarting from the Intent's entry.
+        val restored = StoryPlaybackStateStore.get(payloadToken)
+        val entryId = restored?.entryId
+            ?: intent.getStringExtra(EXTRA_ENTRY_ID)
+            ?: return finish()
         scopeToken = intent.getStringExtra(EXTRA_SCOPE_TOKEN)
         variableScope = AcceleraScopeRegistry.get(scopeToken)
 
@@ -43,10 +55,12 @@ class FullscreenActivity : AppCompatActivity() {
         // never crashes the host app; close the screen on any failure instead.
         val started = runCatching {
             setupUI()
-            val opened = setupCoordinator(entryId)
+            val opened = setupCoordinator(entryId, restored)
             if (opened) {
                 setupGestures()
-                rootLayout.post { activityAnimator.animateOpen(rootLayout) {} }
+                if (restored == null) {
+                    rootLayout.post { activityAnimator.animateOpen(rootLayout) {} }
+                }
             }
             opened
         }.onFailure { Accelera.shared.error("Failed to open stories: ${it.message}") }
@@ -113,7 +127,7 @@ class FullscreenActivity : AppCompatActivity() {
         activityAnimator = StoryEntryAnimator(rootLayout)
     }
 
-    private fun setupCoordinator(entryId: String): Boolean {
+    private fun setupCoordinator(entryId: String, restore: StoryPlaybackSnapshot? = null): Boolean {
         playbackCoordinator = StoryPlaybackCoordinator(
             context = this,
             rootLayout = rootLayout,
@@ -123,7 +137,7 @@ class FullscreenActivity : AppCompatActivity() {
             variableScope = variableScope,
             onCloseRequested = ::closeStories
         )
-        return playbackCoordinator.open(entryId)
+        return playbackCoordinator.open(entryId, restore)
     }
 
     private fun setupGestures() {
@@ -175,19 +189,39 @@ class FullscreenActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         if (::playbackCoordinator.isInitialized) {
+            // Capture the playback position before Destroyed resets the coordinator,
+            // so the recreated activity (rotation etc.) can resume where it was.
+            if (!isFinishing) {
+                playbackCoordinator.captureSnapshot()?.let { snapshot ->
+                    StoryPlaybackStateStore.save(payloadToken, snapshot)
+                }
+            }
             playbackCoordinator.handleEvent(PlaybackEvent.Destroyed)
         }
         if (::gestureHandler.isInitialized) {
             gestureHandler.cleanup()
         }
-        AcceleraScopeRegistry.remove(scopeToken)
+        // Keep payload, playback position and shared variable scope across configuration
+        // changes (the recreated activity re-reads them by the same tokens); release
+        // them only when the screen is really going away.
+        if (isFinishing) {
+            AcceleraScopeRegistry.remove(scopeToken)
+            AcceleraPayloadRegistry.remove(payloadToken)
+            StoryPlaybackStateStore.remove(payloadToken)
+        }
         super.onDestroy()
     }
 
     companion object {
+        /**
+         * Legacy raw-payload extra. Large payloads passed through Intents risk
+         * TransactionTooLargeException; kept only for backward compatibility.
+         * Prefer [EXTRA_PAYLOAD_TOKEN].
+         */
         const val EXTRA_JSON_DATA = "ai.accelera.library.extra.JSON_DATA"
         const val EXTRA_ENTRY_ID = "ai.accelera.library.extra.ENTRY_ID"
         const val EXTRA_SCOPE_TOKEN = "ai.accelera.library.extra.SCOPE_TOKEN"
+        const val EXTRA_PAYLOAD_TOKEN = "ai.accelera.library.extra.PAYLOAD_TOKEN"
     }
 }
 

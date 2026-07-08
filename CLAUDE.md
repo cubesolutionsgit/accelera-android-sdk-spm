@@ -69,9 +69,18 @@ DivKit integration (`banners/infrastructure/divkit`):
 - `AcceleraUrlHandler` — handles `div-action://` URIs: `fullscreen` (launches `FullscreenActivity`), `link` (delegates to `AcceleraDelegate.handleUrl`), `refresh` (reloads attached content), `close` (finishes fullscreen/popup or removes attached content). `ignore` query key skips server event logging.
 
 Stories fullscreen (`banners/presentation/ui/FullscreenActivity`):
-- Launched with `jsonData: ByteArray` + `entryId: String` extras.
-- Follows clean architecture with dedicated use-case/manager classes: `StoryNavigationUseCase`, `StoryProgressManager`, `StoryContainerManager`, `StoryTransitionManager`, `StoryEntryLoader`, `StoryEntryPreloader`, `StoryEventLogger`, `StoryCardDisplayUseCase`.
+- Launched with a payload **token** (`EXTRA_PAYLOAD_TOKEN`) + `entryId: String` extras; the JSON itself stays in `AcceleraPayloadRegistry` (raw `EXTRA_JSON_DATA` is legacy fallback only).
+- Playback is orchestrated by `StoryPlaybackCoordinator` + `PlaybackStateMachine` (`banners/presentation/playback`), with `StoryProgressManager` (card timers), `PlayerLifecycleController` (video pause/resume), `EntryViewRepository` (entry containers), `StoryEntryPreloader`, `StoryEventLogger`.
 - Gesture handling via `StoryGestureHandler`: tap left/right for card nav, swipe left/right for entry nav, swipe down to close, long-press to pause progress.
+
+### State & Lifecycle (in-memory, never in saved instance state)
+Payloads are hundreds of KB, so **nothing content-sized may go into `onSaveInstanceState` or Intent extras** — that overflows the ~1MB Binder limit (`TransactionTooLargeException`). All cross-recreation state lives in process-memory registries under `banners/infrastructure/cache`:
+- `BannerContentCache` — LRU (4MB, byte-sized) of loaded banner JSON, keyed by request key; `AcceleraBanner` seeds from it in `remember` so rotation/lazy-list scroll-back never re-fetches.
+- `AcceleraPayloadRegistry` — hands JSON to `FullscreenActivity`/`PopupActivity` by UUID token in the Intent.
+- `StoryPlaybackStateStore` — `StoryPlaybackSnapshot` (entry, card index, timer fraction, video positions) keyed by payload token; captured in `FullscreenActivity.onDestroy` when `!isFinishing`, passed to `StoryPlaybackCoordinator.open(entryId, restore)` on recreate.
+- Registry entries (payload, snapshot, `AcceleraScopeRegistry` scope) are removed **only when `isFinishing`** — unconditional removal breaks rotation.
+- Video resume: `TrackingPlayerFactory` in `DivKitSetup` observes `DivPlayer.Observer.onCurrentTimeChange` per player; `captureVideoPositions`/`applyVideoPositions` snapshot & seek by player creation order (pending seeks apply lazily as DivKit creates players during rebind).
+- Process death: registries are empty → banner reloads, fullscreen/popup finish gracefully. This is intended.
 
 ### Compose Layer (`ai.accelera.library.compose`)
 - `AcceleraBanner` — Composable; calls `loadBanner` in `LaunchedEffect`, renders `AcceleraDivView` (an `AndroidView` wrapper around `Div2View`).

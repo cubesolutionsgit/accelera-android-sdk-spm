@@ -3,6 +3,7 @@ package ai.accelera.library.banners.presentation.playback
 import android.content.Context
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import ai.accelera.library.banners.domain.model.StoryPlaybackSnapshot
 import ai.accelera.library.banners.domain.model.StoryViewState
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
@@ -48,8 +49,11 @@ class StoryPlaybackCoordinator(
 
     /**
      * Opens playback at the provided entry.
+     *
+     * @param restore Playback position captured before the hosting activity was
+     * recreated; when set, playback resumes at that card and timer position.
      */
-    fun open(entryId: String): Boolean {
+    fun open(entryId: String, restore: StoryPlaybackSnapshot? = null): Boolean {
         if (!stateMachine.onEvent(PlaybackEvent.Open(entryId))) return false
         val entryIds = dataRepository.loadEntryIds()
         if (entryIds.isEmpty()) return false
@@ -60,11 +64,32 @@ class StoryPlaybackCoordinator(
             currentEntryIndex = index,
             currentEntryId = resolvedEntryId
         )
-        val opened = prepareAndShowEntry(resolvedEntryId, animate = false, isPrev = false)
+        val opened = prepareAndShowEntry(
+            entryId = resolvedEntryId,
+            animate = false,
+            isPrev = false,
+            restore = restore?.takeIf { it.entryId == resolvedEntryId }
+        )
         if (opened) {
             scheduleAdjacentPreload()
         }
         return opened
+    }
+
+    /**
+     * Captures the current playback position (entry, card, timer, video positions)
+     * so it can be restored after the hosting activity is recreated.
+     * Returns null when nothing is showing yet.
+     */
+    fun captureSnapshot(): StoryPlaybackSnapshot? {
+        val entryId = viewState.currentEntryId.takeIf { it.isNotEmpty() } ?: return null
+        val cardView = repository.getCurrentContainer()?.getCardView(viewState.currentCardIndex)
+        return StoryPlaybackSnapshot(
+            entryId = entryId,
+            cardIndex = viewState.currentCardIndex,
+            progressFraction = progressManager.currentProgressFraction(),
+            videoPositionsMs = cardView?.let { DivKitSetup.captureVideoPositions(it) } ?: emptyList()
+        )
     }
 
     /**
@@ -202,22 +227,47 @@ class StoryPlaybackCoordinator(
         return loadedEntry to container
     }
 
-    private fun prepareAndShowEntry(entryId: String, animate: Boolean, isPrev: Boolean): Boolean {
+    private fun prepareAndShowEntry(
+        entryId: String,
+        animate: Boolean,
+        isPrev: Boolean,
+        restore: StoryPlaybackSnapshot? = null
+    ): Boolean {
         val prepared = prepareEntry(entryId) ?: return false
         val loadedEntry = prepared.first
         val container = prepared.second
+        val initialCardIndex = restore?.cardIndex
+            ?.takeIf { loadedEntry.cards.isNotEmpty() }
+            ?.coerceIn(0, loadedEntry.cards.size - 1)
+            ?: 0
         repository.setCurrentEntry(loadedEntry.entryId)
         viewState = viewState.copy(
             currentEntryId = loadedEntry.entryId,
             currentEntryIndex = loadedEntry.entryIndex,
             currentCards = loadedEntry.cards,
-            currentCardIndex = 0
+            currentCardIndex = initialCardIndex
         )
         container.visibility = android.view.View.VISIBLE
-        container.showCard(0, animate)
-        playerController.prepareVisibleCard(loadedEntry.entryId, 0)
-        playerController.activateVisibleCard(loadedEntry.entryId, 0)
-        startProgressAndLog(0)
+        // On restore, don't rewind media to the beginning: seek the card's players back
+        // to their captured positions and resume from there.
+        container.showCard(initialCardIndex, animate, restartPlayback = restore == null)
+        playerController.prepareVisibleCard(loadedEntry.entryId, initialCardIndex)
+        if (restore != null && restore.videoPositionsMs.isNotEmpty()) {
+            container.getCardView(initialCardIndex)?.let { cardView ->
+                DivKitSetup.applyVideoPositions(cardView, restore.videoPositionsMs)
+            }
+        }
+        playerController.activateVisibleCard(
+            entryId = loadedEntry.entryId,
+            cardIndex = initialCardIndex,
+            restartPlayback = restore == null
+        )
+        // A restored card was already counted as viewed in this session — don't re-log it.
+        startProgressAndLog(
+            cardIndex = initialCardIndex,
+            startFraction = restore?.progressFraction ?: 0f,
+            logView = restore == null
+        )
         repository.cleanupToAdjacent(viewState.entryIds, viewState.currentEntryIndex)
         scheduleAdjacentPreload()
         stateMachine.forceState(if (animate) PlaybackState.TransitioningEntry else PlaybackState.ShowingCard)
@@ -255,13 +305,19 @@ class StoryPlaybackCoordinator(
         eventLogger.logCardClose(card)
     }
 
-    private fun startProgressAndLog(cardIndex: Int) {
+    private fun startProgressAndLog(
+        cardIndex: Int,
+        startFraction: Float = 0f,
+        logView: Boolean = true
+    ) {
         val card = viewState.currentCards.getOrNull(cardIndex) ?: return
-        eventLogger.logCardView(card)
+        if (logView) {
+            eventLogger.logCardView(card)
+        }
         progressManager.setupProgressBars(viewState.currentCards) { candidate ->
             dataRepository.hasDuration(candidate)
         }
-        progressManager.showCard(cardIndex, dataRepository.getCardDuration(card))
+        progressManager.showCard(cardIndex, dataRepository.getCardDuration(card), startFraction)
     }
 
     private fun scheduleAdjacentPreload() {

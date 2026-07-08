@@ -31,7 +31,6 @@ internal object AcceleraDimens {
 internal object AcceleraTiming {
     const val ENTRY_ANIMATION_MS = 300L
     const val CARD_FADE_MS = 200L
-    const val PROGRESS_FRAME_INTERVAL_MS = 16L
     const val STATE_SETTLE_DELAY_MS = 40L
     const val GESTURE_DEBOUNCE_MS = 150L
     const val DEFAULT_CARD_DURATION_MS = 5000L

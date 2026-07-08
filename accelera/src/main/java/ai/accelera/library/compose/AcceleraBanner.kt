@@ -2,6 +2,7 @@ package ai.accelera.library.compose
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
+import ai.accelera.library.banners.infrastructure.cache.BannerContentCache
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
 import ai.accelera.library.banners.presentation.ui.CloseButton
 import ai.accelera.library.core.constants.AcceleraEvents
@@ -16,7 +17,6 @@ import android.os.Looper
 import org.json.JSONObject
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -46,8 +46,11 @@ fun AcceleraBanner(
     var isDetached by remember { mutableStateOf(false) }
     val requestKey = "$baseRequestKey:$refreshIndex:$detachIndex"
 
-    var jsonData by rememberSaveable(requestKey) { mutableStateOf<ByteArray?>(null) }
-    var isLoading by rememberSaveable(requestKey) { mutableStateOf(!isDetached && jsonData == null) }
+    // The payload can be hundreds of KB, so it must stay out of saved instance state
+    // (rememberSaveable here caused TransactionTooLargeException on activity stop).
+    // BannerContentCache keeps it across configuration changes and lazy-list recycling instead.
+    var jsonData by remember(requestKey) { mutableStateOf(BannerContentCache.get(requestKey)) }
+    var isLoading by remember(requestKey) { mutableStateOf(!isDetached && jsonData == null) }
     val loadBannerContentUseCase = remember { DefaultLoadBannerContentUseCase() }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     var activeRequestKey by remember { mutableStateOf<String?>(null) }
@@ -69,6 +72,7 @@ fun AcceleraBanner(
                     )
                     Accelera.shared.logEvent(payload.toJsonBytes())
                 }
+                BannerContentCache.remove(requestKey)
                 jsonData = null
                 isDetached = true
                 isLoading = false
@@ -108,6 +112,7 @@ fun AcceleraBanner(
                     val loadedData = result
                     // Only show the banner when there is actually something to render.
                     if (loadedData != null && DivKitSetup.hasDisplayableContent(loadedData)) {
+                        BannerContentCache.put(requestKey, loadedData)
                         jsonData = loadedData
                     } else if (loadedData != null) {
                         Accelera.shared.log("No content to display")
@@ -154,6 +159,7 @@ fun AcceleraBanner(
                                     AcceleraJsonKeys.META to meta
                                 )
                                 Accelera.shared.logEvent(payload.toJsonBytes())
+                                BannerContentCache.remove(requestKey)
                                 jsonData = null
                                 isDetached = true
                                 isLoading = false

@@ -2,19 +2,20 @@ package ai.accelera.library.banners.presentation.manager
 
 import android.animation.ValueAnimator
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import ai.accelera.library.banners.presentation.ui.StoryProgressBar
 import ai.accelera.library.core.constants.AcceleraDimens
-import ai.accelera.library.core.constants.AcceleraTiming
 import ai.accelera.library.utils.dpToPx
 import org.json.JSONObject
 
 /**
  * Manages story progress bars and timers.
- * Handles progress animation, pause/resume, and proper cleanup.
+ *
+ * One [StoryProgressBar] is created per card; the current card's bar is driven by a
+ * [ValueAnimator] whose completion triggers [onProgressComplete] (auto-advance).
+ * Pause/resume rely on [ValueAnimator.pause]/[ValueAnimator.resume], which keep the
+ * elapsed fraction internally.
  */
 class StoryProgressManager(
     private val context: Context,
@@ -24,19 +25,7 @@ class StoryProgressManager(
     private val progressBars = mutableListOf<StoryProgressBar>()
     private var progressAnimator: ValueAnimator? = null
     private var isPaused: Boolean = false
-    private var pauseStartTime: Long = 0
-    private var pausedDuration: Long = 0
     private var currentCardIndex: Int = -1
-
-    private val handler = Handler(Looper.getMainLooper())
-    private val progressUpdateRunnable = object : Runnable {
-        override fun run() {
-            if (!isPaused && currentCardIndex >= 0 && currentCardIndex < progressBars.size) {
-                updateProgress()
-                handler.postDelayed(this, AcceleraTiming.PROGRESS_FRAME_INTERVAL_MS) // ~60fps
-            }
-        }
-    }
 
     /**
      * Sets up progress bars for the given cards.
@@ -84,8 +73,11 @@ class StoryProgressManager(
 
     /**
      * Shows a specific card and starts its progress animation.
+     *
+     * @param startFraction Fraction of the timer already elapsed (0..1), used when
+     * restoring playback after the activity was recreated.
      */
-    fun showCard(index: Int, durationMs: Long) {
+    fun showCard(index: Int, durationMs: Long, startFraction: Float = 0f) {
         // Stop any existing progress
         stopProgress()
 
@@ -96,31 +88,40 @@ class StoryProgressManager(
 
         currentCardIndex = index
 
-        // Reset all progress bars
+        val initialFraction = startFraction.coerceIn(0f, 1f)
+
+        // Bars before the current card are full, after it — empty.
         progressBars.forEachIndexed { i, bar ->
-            bar.progress = if (i < index) 1f else 0f
+            bar.progress = when {
+                i < index -> 1f
+                i == index -> initialFraction
+                else -> 0f
+            }
         }
 
-        // Reset pause state
         isPaused = false
-        pausedDuration = 0
-        pauseStartTime = 0
 
-        // Start progress animation
         if (durationMs > 0) {
-            startProgressAnimation(index, durationMs)
+            startProgressAnimation(index, durationMs, initialFraction)
         }
     }
 
     /**
-     * Starts progress animation for a specific card.
+     * Returns the elapsed fraction (0..1) of the current card's timer, or 0 when idle.
      */
-    private fun startProgressAnimation(cardIndex: Int, durationMs: Long) {
+    fun currentProgressFraction(): Float {
+        return (progressAnimator?.animatedValue as? Float) ?: 0f
+    }
+
+    /**
+     * Starts progress animation for a specific card from the given elapsed fraction.
+     */
+    private fun startProgressAnimation(cardIndex: Int, durationMs: Long, startFraction: Float = 0f) {
         if (cardIndex >= progressBars.size) return
 
         val bar = progressBars[cardIndex]
-        progressAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            this.duration = durationMs
+        progressAnimator = ValueAnimator.ofFloat(startFraction, 1f).apply {
+            this.duration = (durationMs * (1f - startFraction)).toLong().coerceAtLeast(1L)
             addUpdateListener { animator ->
                 if (!isPaused && currentCardIndex == cardIndex) {
                     val progress = animator.animatedValue as Float
@@ -135,77 +136,43 @@ class StoryProgressManager(
     }
 
     /**
-     * Pauses progress animation.
+     * Pauses progress animation; the elapsed fraction is preserved by the animator.
      */
     fun pauseProgress() {
         if (isPaused) return
         isPaused = true
-        pauseStartTime = System.currentTimeMillis()
         progressAnimator?.pause()
-        handler.removeCallbacks(progressUpdateRunnable)
     }
 
     /**
-     * Resumes progress animation.
+     * Resumes progress animation from where it was paused.
      */
     fun resumeProgress() {
         if (!isPaused) return
         if (currentCardIndex < 0 || currentCardIndex >= progressBars.size) return
         isPaused = false
-        pausedDuration += System.currentTimeMillis() - pauseStartTime
         progressAnimator?.resume()
     }
 
     /**
-     * Stops progress animation and cleans up.
+     * Stops progress animation and resets timer state (bars stay attached).
      */
     fun stopProgress() {
-        // Remove all callbacks for this runnable
-        handler.removeCallbacks(progressUpdateRunnable)
-        
-        // Cancel animator and remove listeners
         progressAnimator?.cancel()
         progressAnimator?.removeAllUpdateListeners()
         progressAnimator?.removeAllListeners()
         progressAnimator = null
-        
-        // Reset state
+
         isPaused = false
-        pausedDuration = 0
-        pauseStartTime = 0
         currentCardIndex = -1
     }
 
     /**
-     * Updates progress (called by handler for smooth updates).
-     */
-    private fun updateProgress() {
-        // The actual animation is handled by ValueAnimator
-        // This method can be used for additional smooth updates if needed
-    }
-
-    /**
-     * Cleans up resources.
+     * Releases everything; the manager must not be used afterwards.
      */
     fun cleanup() {
-        // Stop progress first
         stopProgress()
-        
-        // Remove all handler callbacks to prevent memory leaks
-        handler.removeCallbacksAndMessages(null)
-        
-        // Cancel and clear animator
-        progressAnimator?.cancel()
-        progressAnimator?.removeAllUpdateListeners()
-        progressAnimator?.removeAllListeners()
-        progressAnimator = null
-        
-        // Clear all references
         progressBars.clear()
-        isPaused = false
-        pausedDuration = 0
-        pauseStartTime = 0
-        currentCardIndex = -1
     }
 }
 

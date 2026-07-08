@@ -2,6 +2,7 @@ package ai.accelera.library.banners.infrastructure.divkit
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.AcceleraAttachedContentContext
+import ai.accelera.library.banners.infrastructure.cache.AcceleraPayloadRegistry
 import ai.accelera.library.banners.presentation.ui.FullscreenActivity
 import ai.accelera.library.core.constants.AcceleraActionQuery
 import ai.accelera.library.core.constants.AcceleraActionTypes
@@ -82,7 +83,12 @@ internal class AcceleraUrlHandler(
                 }
 
                 val intent = Intent(activity, FullscreenActivity::class.java).apply {
-                    putExtra(FullscreenActivity.EXTRA_JSON_DATA, jsonData)
+                    // Pass the payload by token — raw JSON in an Intent extra can overflow
+                    // the Binder transaction limit (TransactionTooLargeException).
+                    putExtra(
+                        FullscreenActivity.EXTRA_PAYLOAD_TOKEN,
+                        AcceleraPayloadRegistry.register(jsonData)
+                    )
                     putExtra(FullscreenActivity.EXTRA_ENTRY_ID, id)
                     originContext?.registerSharedVariableScope()?.let { token ->
                         putExtra(FullscreenActivity.EXTRA_SCOPE_TOKEN, token)

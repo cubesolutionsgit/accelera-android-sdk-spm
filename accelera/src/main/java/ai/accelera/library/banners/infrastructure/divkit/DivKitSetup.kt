@@ -32,15 +32,42 @@ import org.json.JSONObject
  *
  * - [pauseAll]: temporary stop, player stays alive (use when hiding a card)
  * - [playAll]: resume after pause (use when showing a card)
+ * - [restartAll]: rewind to the beginning and play (use when re-showing a card)
  * - [releaseAll]: permanent destruction (use only when Div2View is discarded)
+ *
+ * It also tracks the current playback position of every player (via
+ * [DivPlayer.Observer.onCurrentTimeChange]) so playback can survive a hosting
+ * activity recreation: [capturePositionsMs] snapshots positions before the old
+ * view is destroyed, [applyPositionsMs] seeks the recreated players back. Because
+ * DivKit creates players lazily while binding the new view, positions that cannot
+ * be applied immediately are kept pending and consumed in [makePlayer] as the
+ * players appear, matched by creation order (deterministic for identical JSON).
  */
 private class TrackingPlayerFactory(context: Context) : DivPlayerFactory {
+
+    private class TrackedPlayer(val player: DivPlayer) {
+        @Volatile
+        var lastPositionMs: Long = 0
+    }
+
     private val delegate = ExoDivPlayerFactory(context)
-    private val activePlayers = mutableListOf<DivPlayer>()
+    private val trackedPlayers = mutableListOf<TrackedPlayer>()
+    private var pendingSeekPositionsMs: MutableList<Long?>? = null
 
     override fun makePlayer(src: List<DivVideoSource>, config: DivPlayerPlaybackConfig): DivPlayer {
         val player = delegate.makePlayer(src, config)
-        activePlayers.add(player)
+        val tracked = TrackedPlayer(player)
+        player.addObserver(object : DivPlayer.Observer {
+            override fun onCurrentTimeChange(timeMs: Long) {
+                tracked.lastPositionMs = timeMs
+            }
+
+            override fun onEnd() {
+                tracked.lastPositionMs = 0
+            }
+        })
+        trackedPlayers.add(tracked)
+        consumePendingSeek(trackedPlayers.size - 1, tracked)
         return player
     }
 
@@ -49,25 +76,53 @@ private class TrackingPlayerFactory(context: Context) : DivPlayerFactory {
     override fun makePreloader(): DivPlayerPreloader = delegate.makePreloader()
 
     fun pauseAll() {
-        activePlayers.forEach { runCatching { it.pause() } }
+        trackedPlayers.forEach { runCatching { it.player.pause() } }
     }
 
     fun playAll() {
-        activePlayers.forEach { runCatching { it.play() } }
+        trackedPlayers.forEach { runCatching { it.player.play() } }
     }
 
     fun restartAll() {
-        activePlayers.forEach {
+        trackedPlayers.forEach {
             runCatching {
-                it.seek(0)
-                it.play()
+                it.player.seek(0)
+                it.lastPositionMs = 0
+                it.player.play()
             }
         }
     }
 
     fun releaseAll() {
-        activePlayers.forEach { runCatching { it.release() } }
-        activePlayers.clear()
+        trackedPlayers.forEach { runCatching { it.player.release() } }
+        trackedPlayers.clear()
+        pendingSeekPositionsMs = null
+    }
+
+    /**
+     * Returns the last known playback position of every player, in creation order.
+     */
+    fun capturePositionsMs(): List<Long> = trackedPlayers.map { it.lastPositionMs }
+
+    /**
+     * Seeks players back to previously captured positions. Positions for players
+     * that don't exist yet are applied later, when [makePlayer] creates them.
+     */
+    fun applyPositionsMs(positionsMs: List<Long>) {
+        pendingSeekPositionsMs = positionsMs.mapTo(mutableListOf()) { it }
+        trackedPlayers.forEachIndexed { index, tracked -> consumePendingSeek(index, tracked) }
+    }
+
+    private fun consumePendingSeek(index: Int, tracked: TrackedPlayer) {
+        val pending = pendingSeekPositionsMs ?: return
+        val positionMs = pending.getOrNull(index) ?: return
+        pending[index] = null
+        if (positionMs > 0) {
+            runCatching {
+                tracked.player.seek(positionMs)
+                tracked.lastPositionMs = positionMs
+            }
+        }
     }
 }
 
@@ -78,7 +133,11 @@ private class TrackingPlayerFactory(context: Context) : DivPlayerFactory {
  */
 internal object DivKitSetup {
 
-    private val playerFactories = mutableMapOf<Div2View, TrackingPlayerFactory>()
+    /**
+     * Weak keys: a Div2View whose owner never calls [releaseVideoPlayers]
+     * (e.g. discarded without cleanup) must not be pinned in memory by this map.
+     */
+    private val playerFactories = java.util.WeakHashMap<Div2View, TrackingPlayerFactory>()
 
     /**
      * Creates a Div2View with configured components.
@@ -184,6 +243,23 @@ internal object DivKitSetup {
      */
     fun releaseVideoPlayers(view: Div2View) {
         playerFactories.remove(view)?.releaseAll()
+    }
+
+    /**
+     * Snapshots the current playback position (ms) of every player in a Div2View,
+     * in player creation order. Use before the hosting activity is recreated.
+     */
+    fun captureVideoPositions(view: Div2View): List<Long> {
+        return playerFactories[view]?.capturePositionsMs() ?: emptyList()
+    }
+
+    /**
+     * Seeks a Div2View's players back to previously captured positions.
+     * Players that DivKit has not created yet are seeked as they appear.
+     */
+    fun applyVideoPositions(view: Div2View, positionsMs: List<Long>) {
+        if (positionsMs.isEmpty()) return
+        playerFactories[view]?.applyPositionsMs(positionsMs)
     }
 
     /**

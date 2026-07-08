@@ -3,6 +3,7 @@ package ai.accelera.library.banners
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.domain.usecase.DefaultLoadBannerContentUseCase
 import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTracker
+import ai.accelera.library.banners.infrastructure.cache.AcceleraPayloadRegistry
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.presentation.ui.PopupActivity
@@ -98,7 +99,12 @@ object AcceleraBanners {
                 }
 
                 val intent = Intent(activity, PopupActivity::class.java).apply {
-                    putExtra(PopupActivity.EXTRA_JSON_DATA, jsonData)
+                    // Pass the payload by token — raw JSON in an Intent extra can overflow
+                    // the Binder transaction limit (TransactionTooLargeException).
+                    putExtra(
+                        PopupActivity.EXTRA_PAYLOAD_TOKEN,
+                        AcceleraPayloadRegistry.register(jsonData)
+                    )
                     variableScope?.let { scope ->
                         putExtra(PopupActivity.EXTRA_SCOPE_TOKEN, AcceleraScopeRegistry.register(scope))
                     }

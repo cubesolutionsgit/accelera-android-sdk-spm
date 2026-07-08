@@ -2,6 +2,7 @@ package ai.accelera.library.banners.presentation.ui
 
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTracker
+import ai.accelera.library.banners.infrastructure.cache.AcceleraPayloadRegistry
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
 import ai.accelera.library.banners.infrastructure.divkit.DivKitSetup
@@ -25,13 +26,17 @@ class PopupActivity : AppCompatActivity() {
     private lateinit var jsonData: ByteArray
     private var divView: Div2View? = null
     private var scopeToken: String? = null
+    private var payloadToken: String? = null
     private var variableScope: AcceleraDivVariableScope? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AcceleraActivityTracker.note(this)
 
-        jsonData = intent.getByteArrayExtra(EXTRA_JSON_DATA) ?: return finish()
+        payloadToken = intent.getStringExtra(EXTRA_PAYLOAD_TOKEN)
+        jsonData = AcceleraPayloadRegistry.get(payloadToken)
+            ?: intent.getByteArrayExtra(EXTRA_JSON_DATA)
+            ?: return finish()
         scopeToken = intent.getStringExtra(EXTRA_SCOPE_TOKEN)
         variableScope = AcceleraScopeRegistry.get(scopeToken)
 
@@ -117,12 +122,24 @@ class PopupActivity : AppCompatActivity() {
     override fun onDestroy() {
         divView?.let { DivKitSetup.releaseVideoPlayers(it) }
         divView = null
-        AcceleraScopeRegistry.remove(scopeToken)
+        // Keep the payload and shared variable scope across configuration changes
+        // (the recreated activity re-reads them by the same tokens); release them
+        // only when the popup is really going away.
+        if (isFinishing) {
+            AcceleraScopeRegistry.remove(scopeToken)
+            AcceleraPayloadRegistry.remove(payloadToken)
+        }
         super.onDestroy()
     }
 
     companion object {
+        /**
+         * Legacy raw-payload extra. Large payloads passed through Intents risk
+         * TransactionTooLargeException; kept only for backward compatibility.
+         * Prefer [EXTRA_PAYLOAD_TOKEN].
+         */
         const val EXTRA_JSON_DATA = "ai.accelera.library.extra.JSON_DATA"
         const val EXTRA_SCOPE_TOKEN = "ai.accelera.library.extra.SCOPE_TOKEN"
+        const val EXTRA_PAYLOAD_TOKEN = "ai.accelera.library.extra.PAYLOAD_TOKEN"
     }
 }
