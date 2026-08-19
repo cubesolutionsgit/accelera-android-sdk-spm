@@ -5,7 +5,9 @@ import ai.accelera.library.banners.AcceleraBanners
 import ai.accelera.library.core.api.DefaultApiProvider
 import ai.accelera.library.core.di.InternalModule
 import android.content.Context
+import android.app.Activity
 import android.view.ViewGroup
+import androidx.lifecycle.LifecycleOwner
 import kotlinx.serialization.json.Json
 
 /**
@@ -161,6 +163,14 @@ class Accelera private constructor() {
 
     fun showPopup(context: Context, data: ByteArray? = null) {
         AcceleraBanners.showPopup(context, data)
+    }
+
+    fun showPopup(
+        activity: Activity,
+        lifecycleOwner: LifecycleOwner,
+        data: ByteArray? = null
+    ) {
+        AcceleraBanners.showPopup(activity, lifecycleOwner, data)
     }
 
     internal fun getApi(): AcceleraAPIProtocol {

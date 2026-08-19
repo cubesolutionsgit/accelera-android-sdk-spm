@@ -197,6 +197,31 @@ Accelera.shared.showPopup(
 )
 ```
 
+Если ответ может прийти после перехода на другой Fragment или destination внутри
+той же Activity, передайте lifecycle конкретного экрана. SDK покажет попап только
+пока этот экран находится в `RESUMED`:
+
+```kotlin
+// Fragment
+Accelera.shared.showPopup(
+    activity = requireActivity(),
+    lifecycleOwner = viewLifecycleOwner,
+    data = popupData
+)
+
+// Navigation Compose
+val context = LocalContext.current
+val lifecycleOwner = LocalLifecycleOwner.current
+val activity = context.parentActivity
+
+if (activity != null) {
+    Accelera.shared.showPopup(activity, lifecycleOwner, popupData)
+}
+```
+
+Если Activity или исходный экран уже недоступны, запрос/показ безопасно
+пропускается и исключение не передаётся в приложение.
+
 #### Общий scope переменных
 
 Для контента, созданного через `attachContentPlaceholder`, SDK использует общий DivKit variable scope между исходным баннером и fullscreen-сторис, открытыми через `div-action://fullscreen`. Поэтому `set_variable` внутри fullscreen обновляет тот же набор переменных, который использует исходный баннер.

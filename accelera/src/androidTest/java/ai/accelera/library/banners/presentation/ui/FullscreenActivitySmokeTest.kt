@@ -12,9 +12,30 @@ class FullscreenActivitySmokeTest {
     @Test
     fun launch_withRequiredExtras_doesNotCrash() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val json = """
+            {
+              "fullscreens": {
+                "entry-1": {
+                  "cards": [
+                    {
+                      "card": {
+                        "log_id": "fullscreen_smoke",
+                        "states": [
+                          {
+                            "state_id": 0,
+                            "div": { "type": "text", "text": "Smoke test" }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+        """.trimIndent().toByteArray()
         val intent = Intent(context, FullscreenActivity::class.java).apply {
-            putExtra("jsonData", """{"fullscreens":{"entry-1":{"cards":[]}}}""".toByteArray())
-            putExtra("entryId", "entry-1")
+            putExtra(FullscreenActivity.EXTRA_JSON_DATA, json)
+            putExtra(FullscreenActivity.EXTRA_ENTRY_ID, "entry-1")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
