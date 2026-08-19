@@ -32,7 +32,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts (app)
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.1")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.2")
 }
 ```
 
@@ -472,7 +472,7 @@ Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
 
 ---
 
-📄 Версия: `0.6.0`
-📆 Обновлено: июнь 2026
+📄 Версия: `0.6.2`
+📆 Обновлено: август 2026
 📫 Поддержка: [@cubesolutionsgit](https://github.com/cubesolutionsgit)
 🔗 Репозиторий: [accelera-android-sdk-spm](https://github.com/cubesolutionsgit/accelera-android-sdk-spm)
