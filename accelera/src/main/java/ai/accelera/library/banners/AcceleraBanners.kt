@@ -21,6 +21,8 @@ import java.lang.ref.WeakReference
  * Extension functions for Accelera banners module (similar to Accelera+Banners in iOS).
  */
 object AcceleraBanners {
+    private val popupRequestArbiter = PopupRequestArbiter()
+
     /**
      * Loads and attaches dynamic content into the given container.
      *
@@ -71,6 +73,12 @@ object AcceleraBanners {
         showPopup(activity, activity as? LifecycleOwner, data, variableScope = null)
     }
 
+    /**
+     * Shows a popup scoped to the resolved Activity.
+     *
+     * Compose Navigation destinations share one Activity, so they should use
+     * `rememberAcceleraPopupController()` to bind the request to their own lifecycle.
+     */
     fun showPopup(context: Context, data: ByteArray? = null) {
         val activity = runCatching { context.parentActivity ?: AcceleraActivityTracker.currentActivity() }
             .getOrNull()
@@ -81,6 +89,7 @@ object AcceleraBanners {
         showPopup(activity, activity as? LifecycleOwner, data, variableScope = null)
     }
 
+    /** Shows a popup only while [lifecycleOwner] remains the active screen. */
     fun showPopup(
         activity: Activity,
         lifecycleOwner: LifecycleOwner,
@@ -118,6 +127,7 @@ object AcceleraBanners {
         val activityRef = WeakReference(activity)
         val lifecycleOwnerRef = lifecycleOwner?.let(::WeakReference)
         val completionGate = PopupCompletionGate()
+        val requestId = popupRequestArbiter.beginRequest()
 
         val paramsString = data?.let { String(it, Charsets.UTF_8) } ?: "<invalid>"
         safeLog("Loading popup content with params: $paramsString")
@@ -133,7 +143,8 @@ object AcceleraBanners {
                                 lifecycleOwnerRef = lifecycleOwnerRef,
                                 result = result,
                                 error = error,
-                                variableScope = variableScope
+                                variableScope = variableScope,
+                                requestId = requestId
                             )
                         }.onFailure { safeError("Failed to present popup: ${it.message}") }
                     }
@@ -151,12 +162,14 @@ object AcceleraBanners {
         lifecycleOwnerRef: WeakReference<LifecycleOwner>?,
         result: ByteArray?,
         error: Any?,
-        variableScope: AcceleraDivVariableScope?
+        variableScope: AcceleraDivVariableScope?,
+        requestId: Long
     ) {
         val activity = activityRef.get()
         val owner = lifecycleOwnerRef?.get()
         val lifecycleState = owner?.lifecycle?.currentState
-        val canPresent = activity != null && PopupPresentationPolicy.canPresent(
+        val canPresent = popupRequestArbiter.isLatest(requestId) &&
+            activity != null && PopupPresentationPolicy.canPresent(
             isSameActivity = AcceleraActivityTracker.currentActivity() === activity,
             isActivityAlive = !activity.isFinishing && !activity.isDestroyed,
             hasWindowFocus = activity.hasWindowFocus(),

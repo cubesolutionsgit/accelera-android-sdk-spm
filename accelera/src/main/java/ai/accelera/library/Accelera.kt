@@ -161,6 +161,10 @@ class Accelera private constructor() {
         AcceleraBanners.showPopup(data)
     }
 
+    /**
+     * Shows a popup scoped to the resolved Activity. Compose Navigation callers
+     * should use `rememberAcceleraPopupController()` instead.
+     */
     fun showPopup(context: Context, data: ByteArray? = null) {
         AcceleraBanners.showPopup(context, data)
     }

@@ -188,36 +188,36 @@ bannerController.refresh()
 bannerController.detach()
 ```
 
-Popup открывается из Compose тем же Activity-based API:
+Для Compose Navigation используйте controller, привязанный к lifecycle текущего
+`NavBackStackEntry`:
 
 ```kotlin
-Accelera.shared.showPopup(
-    context = LocalContext.current,
-    data = mapOf("type" to "popup", "slot" to "promo").toJsonBytes()
-)
+val popupController = rememberAcceleraPopupController()
+
+LaunchedEffect(Unit) {
+    popupController.show(
+        mapOf("type" to "popup", "slot" to "promo").toJsonBytes()
+    )
+}
 ```
 
-Если ответ может прийти после перехода на другой Fragment или destination внутри
-той же Activity, передайте lifecycle конкретного экрана. SDK покажет попап только
-пока этот экран находится в `RESUMED`:
+Controller покажет попап только пока destination находится в `RESUMED`. Новый
+запрос также делает все предыдущие запросы неактуальными, поэтому ответы страниц
+A и B не могут открыть два наложенных попапа.
+
+Для Fragment передавайте lifecycle его View:
 
 ```kotlin
-// Fragment
 Accelera.shared.showPopup(
     activity = requireActivity(),
     lifecycleOwner = viewLifecycleOwner,
     data = popupData
 )
-
-// Navigation Compose
-val context = LocalContext.current
-val lifecycleOwner = LocalLifecycleOwner.current
-val activity = context.parentActivity
-
-if (activity != null) {
-    Accelera.shared.showPopup(activity, lifecycleOwner, popupData)
-}
 ```
+
+Вызов `showPopup(context, data)` остаётся доступен, но он различает
+экраны только на уровне Activity. Для Compose destinations используйте
+`rememberAcceleraPopupController()`.
 
 Если Activity или исходный экран уже недоступны, запрос/показ безопасно
 пропускается и исключение не передаётся в приложение.

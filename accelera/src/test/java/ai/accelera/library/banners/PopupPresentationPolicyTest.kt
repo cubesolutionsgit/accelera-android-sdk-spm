@@ -8,6 +8,70 @@ import org.junit.Test
 
 class PopupPresentationPolicyTest {
     @Test
+    fun `new popup request supersedes previous request`() {
+        val arbiter = PopupRequestArbiter()
+        val pageA = arbiter.beginRequest()
+        val pageB = arbiter.beginRequest()
+
+        assertFalse(arbiter.isLatest(pageA))
+        assertTrue(arbiter.isLatest(pageB))
+    }
+
+    @Test
+    fun `page B wins when page A response arrives first`() {
+        val arbiter = PopupRequestArbiter()
+        val pageA = arbiter.beginRequest()
+        val pageB = arbiter.beginRequest()
+
+        val pageADecision = PopupResultPolicy.decide(
+            result = "A".toByteArray(),
+            error = null,
+            canPresent = arbiter.isLatest(pageA)
+        )
+        val pageBDecision = PopupResultPolicy.decide(
+            result = "B".toByteArray(),
+            error = null,
+            canPresent = arbiter.isLatest(pageB)
+        )
+
+        assertEquals(PopupResultDecision.ScreenInactive, pageADecision)
+        assertTrue(pageBDecision is PopupResultDecision.Present)
+    }
+
+    @Test
+    fun `page B wins when page B response arrives first`() {
+        val arbiter = PopupRequestArbiter()
+        val pageA = arbiter.beginRequest()
+        val pageB = arbiter.beginRequest()
+
+        val pageBDecision = PopupResultPolicy.decide(
+            result = "B".toByteArray(),
+            error = null,
+            canPresent = arbiter.isLatest(pageB)
+        )
+        val latePageADecision = PopupResultPolicy.decide(
+            result = "A".toByteArray(),
+            error = null,
+            canPresent = arbiter.isLatest(pageA)
+        )
+
+        assertTrue(pageBDecision is PopupResultDecision.Present)
+        assertEquals(PopupResultDecision.ScreenInactive, latePageADecision)
+    }
+
+    @Test
+    fun `latest request is still rejected after its page leaves resumed state`() {
+        val arbiter = PopupRequestArbiter()
+        val pageA = arbiter.beginRequest()
+
+        val canPresent = arbiter.isLatest(pageA) && activePolicy(
+            lifecycleState = Lifecycle.State.CREATED
+        )
+
+        assertFalse(canPresent)
+    }
+
+    @Test
     fun `load error takes precedence over screen state`() {
         val error = IllegalStateException("network failed")
 

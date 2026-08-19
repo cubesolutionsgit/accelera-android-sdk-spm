@@ -3,6 +3,7 @@ package ai.accelera.spmlibrary.demo
 import ai.accelera.library.Accelera
 import ai.accelera.library.banners.AcceleraBanners
 import ai.accelera.library.banners.AcceleraContentHandle
+import ai.accelera.library.compose.rememberAcceleraPopupController
 import ai.accelera.spmlibrary.BuildConfig
 import ai.accelera.spmlibrary.ui.theme.SpmLibraryTheme
 import android.view.ViewGroup
@@ -41,6 +42,7 @@ internal fun HomeTab(
     showError: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val popupController = rememberAcceleraPopupController()
     val listState = rememberLazyListState()
     var apiUrl by rememberSaveable { mutableStateOf(configState.appliedUrl.ifBlank { BuildConfig.ACCELERA_URL }) }
     var token by rememberSaveable { mutableStateOf(configState.appliedToken.ifBlank { BuildConfig.ACCELERA_TOKEN }) }
@@ -224,7 +226,7 @@ internal fun HomeTab(
                             return@Button
                         }
                         val data = validateJson(popupData, showError) ?: return@Button
-                        Accelera.shared.showPopup(context, data)
+                        popupController.show(data)
                         DemoEvents.log("showPopup")
                     }
                 ) {

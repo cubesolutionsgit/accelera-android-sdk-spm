@@ -2,6 +2,7 @@ package ai.accelera.library.banners
 
 import androidx.lifecycle.Lifecycle
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /** Pure popup presentation policy, kept separate so lifecycle races are unit-testable. */
 internal object PopupPresentationPolicy {
@@ -41,6 +42,18 @@ internal class PopupCompletionGate {
     private val completed = AtomicBoolean(false)
 
     fun tryComplete(): Boolean = completed.compareAndSet(false, true)
+}
+
+/**
+ * Global latest-request-wins arbiter. A newer popup request permanently makes
+ * every older successful response ineligible for presentation.
+ */
+internal class PopupRequestArbiter {
+    private val latestRequestId = AtomicLong(0)
+
+    fun beginRequest(): Long = latestRequestId.incrementAndGet()
+
+    fun isLatest(requestId: Long): Boolean = latestRequestId.get() == requestId
 }
 
 /** Registers launch resources atomically and rolls them back if Activity launch fails. */
