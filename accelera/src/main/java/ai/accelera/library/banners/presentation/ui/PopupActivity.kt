@@ -14,10 +14,12 @@ import ai.accelera.library.utils.dpToPx
 import ai.accelera.library.utils.meta
 import ai.accelera.library.utils.toJsonBytes
 import android.os.Bundle
+import android.graphics.Color
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import com.yandex.div.DivDataTag
 import com.yandex.div.core.view2.Div2View
 import org.json.JSONObject
@@ -32,6 +34,14 @@ class PopupActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AcceleraActivityTracker.note(this)
+
+        // Keep the DivKit viewport identical to iOS/web: the popup JSON uses a
+        // match-parent root and centers its content inside the full screen. If
+        // Android fits the decor to system windows, status/navigation bars are
+        // removed from that viewport and "center" is visibly shifted.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
 
         payloadToken = intent.getStringExtra(EXTRA_PAYLOAD_TOKEN)
         jsonData = AcceleraPayloadRegistry.get(payloadToken)
