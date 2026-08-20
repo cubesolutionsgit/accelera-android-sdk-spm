@@ -22,13 +22,14 @@ internal const val defaultBannerJson = """
 
 internal const val defaultPopupJson = """
 {
-  "slot": "main_top_stories",
+  "slot": "main_popup",
   "channel": "dev",
   "userInfo": {
-    "client_id": "asd",
-    "language": "KZ"
+    "client_id": "asd422244",
+    "language": "RU"
   },
-  "type": "popup"
+  "type": "popup",
+  "theme": "dark"
 }
 """
 

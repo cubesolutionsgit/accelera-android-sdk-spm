@@ -8,6 +8,7 @@ import android.content.Context
 import android.app.Activity
 import android.view.ViewGroup
 import androidx.lifecycle.LifecycleOwner
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
