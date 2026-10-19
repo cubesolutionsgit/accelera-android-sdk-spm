@@ -61,7 +61,7 @@ class EntryViewRepository(
         if (preloadedFirstCardViews.containsKey(entryId)) return
         val divView = makeDivView()
         val cardBytes = firstCard.toString().toByteArray(Charsets.UTF_8)
-        val divData = DivKitSetup.parseDivData(cardBytes) ?: return
+        val divData = DivKitSetup.parseDivData(cardBytes, jsonData) ?: return
         val tag = DivDataTag("story_${entryId}_0_preload")
         divView.setData(divData, tag)
         DivKitSetup.pauseVideoPlayers(divView)

@@ -15,6 +15,7 @@
 - [Сторис: поведение при диплинке](#-сторис-поведение-при-диплинке)
 - [Жизненный цикл и состояние](#-жизненный-цикл-и-состояние)
 - [Кастомный API](#-кастомный-api)
+- [Шрифты](#шрифты)
 
 ---
 
@@ -471,6 +472,66 @@ Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
 ```
 
 ---
+
+## Шрифты
+
+Обычный текст DivKit (`font_family`, `font_weight`, `font_weight_value`) и текст внутри Lottie
+используют общий механизм выбора шрифта. Как в iOS, шрифты приложения нужно подключить до
+отображения контента. Неизвестное семейство заменяется системным без падения приложения.
+
+### TTF и OTF из assets
+
+Поместите файлы в `app/src/main/assets/fonts/`. Например:
+
+```text
+fonts/Teko.ttf
+fonts/Brand-Regular.otf
+fonts/Brand-Medium.otf
+fonts/Brand-Bold.otf
+fonts/Brand-Italic.otf
+fonts/Brand-BoldItalic.otf
+```
+
+В DivKit задайте `"font_family": "Teko"` или `"font_family": "Brand"`.
+SDK сначала ищет файл нужного начертания (`Family-Light`, `Family-Medium`, `Family-SemiBold`,
+`Family-Bold` и т. д.), затем базовый `Family.ttf` / `Family.otf`.
+Точное имя файла без расширения также можно использовать как имя конкретного начертания.
+Lottie использует `fFamily`, `fStyle` и точное имя `fName`; встроенные в анимацию glyph-контуры
+и шрифты из Lottie ZIP сохраняются.
+
+### res/font и собственный поставщик
+
+Для Android font resources, XML-семейств или собственного реестра задайте `fontProvider`
+в существующем делегате приложения. Он имеет приоритет над `assets/fonts`.
+Возвращайте `null` для неизвестного семейства, чтобы SDK продолжил стандартный поиск.
+
+```kotlin
+import ai.accelera.library.AcceleraFontProvider
+import ai.accelera.library.DefaultAcceleraDelegate
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.TypefaceCompat
+
+val appContext = context.applicationContext
+val brand = requireNotNull(ResourcesCompat.getFont(appContext, R.font.brand))
+
+Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
+    override val fontProvider = AcceleraFontProvider { family, weight, italic ->
+        when (family) {
+            "Brand" -> TypefaceCompat.create(appContext, brand, weight, italic)
+            else -> null
+        }
+    }
+    // Остальные обработчики делегата приложения остаются здесь.
+})
+```
+
+Для точного имени начертания (например, `Brand-BoldItalic`) возвращайте соответствующий
+`Typeface` без изменения его стиля. Семейство и числовой вес кешируются на время жизни
+контента; после смены поставщика создайте представления заново.
+На Android 9+ поддерживаются числовые веса 100–900; на Android 7–8 AndroidX выбирает
+доступное начертание. Для variable font используйте базовый файл семейства.
+SDK не скачивает шрифты по произвольным URL: как и в iOS, нужный шрифт должен быть
+подключён приложением. Для точного Teko в Lottie добавьте `fonts/Teko.ttf`.
 
 📄 Версия: `0.6.2`
 📆 Обновлено: август 2026

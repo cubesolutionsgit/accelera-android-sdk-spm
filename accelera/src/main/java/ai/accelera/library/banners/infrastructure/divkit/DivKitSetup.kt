@@ -14,7 +14,7 @@ import com.yandex.div.core.view2.Div2View
 import com.yandex.div.data.DivParsingEnvironment
 import com.yandex.div.glide.GlideDivImageLoader
 import com.yandex.div.json.ParsingErrorLogger
-import com.yandex.div.lottie.DivLottieExtensionHandler
+import com.yandex.div.lottie.DivLottieLogger
 import com.yandex.div.lottie.DivLottieRawResProvider
 import com.yandex.div.core.player.DivPlayer
 import com.yandex.div.core.player.DivPlayerFactory
@@ -277,15 +277,27 @@ internal object DivKitSetup {
     ): DivConfiguration {
         val appContext = context.applicationContext ?: context
         val imageLoader = GlideDivImageLoader(appContext)
+        val fonts = AcceleraFontResolver(appContext)
 
         val lottieRawResProvider = object : DivLottieRawResProvider {
             override fun provideRes(url: String): Int? = null
             override fun provideAssetFile(url: String): String? = null
         }
 
-        val lottieExtensionHandler = DivLottieExtensionHandler(lottieRawResProvider)
+        val lottieExtensionHandler = AcceleraLottieExtensionHandler(
+            lottieRawResProvider,
+            object : DivLottieLogger {
+                override fun log(message: String) = Accelera.shared.log("Lottie: $message")
+                override fun fail(message: String, throwable: Throwable?) {
+                    Accelera.shared.error("Lottie: $message${throwable?.let { ": ${it.message}" }.orEmpty()}")
+                }
+            },
+            fonts
+        )
 
         val builder = DivConfiguration.Builder(imageLoader)
+            .typefaceProvider(fonts.divProvider("sans-serif"))
+            .additionalTypefaceProviders(fonts.divProviders())
             .actionHandler(AcceleraUrlHandler(context, jsonData, originContext))
             .divErrorsReporter(createErrorLogger())
             .extension(lottieExtensionHandler)
@@ -326,9 +338,10 @@ internal object DivKitSetup {
      * Handles both card format and direct div format.
      *
      * @param jsonData JSON bytes to parse
+     * @param templateSource Original content payload containing shared templates for extracted cards.
      * @return Parsed DivData or null if parsing fails
      */
-    fun parseDivData(jsonData: ByteArray): DivData? {
+    fun parseDivData(jsonData: ByteArray, templateSource: ByteArray = jsonData): DivData? {
         return runCatching {
             val jsonString = String(jsonData, Charsets.UTF_8)
             val jsonObject = JSONObject(jsonString)
@@ -339,6 +352,11 @@ internal object DivKitSetup {
             }
 
             val environment = DivParsingEnvironment(ParsingErrorLogger.LOG)
+            JSONObject(String(templateSource, Charsets.UTF_8)).optJSONObject("templates")
+                ?.let { environment.parseTemplates(it) }
+            if (templateSource !== jsonData) {
+                jsonObject.optJSONObject("templates")?.let { environment.parseTemplates(it) }
+            }
 
             DivData(environment, divObject)
         }.onFailure { e ->

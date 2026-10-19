@@ -92,7 +92,7 @@ class StoryCardContainerView @JvmOverloads constructor(
 
                 // Load card data
                 val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
-                val divData = DivKitSetup.parseDivData(cardBytes)
+                val divData = DivKitSetup.parseDivData(cardBytes, jsonData)
                 if (divData != null) {
                     val tag = DivDataTag("story_${entryId}_$index")
                     divView.setData(divData, tag)
@@ -160,7 +160,7 @@ class StoryCardContainerView @JvmOverloads constructor(
                 // Only set data on newly created views; cached views already have data from preloading
                 if (!isCached) {
                     val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
-                    val divData = DivKitSetup.parseDivData(cardBytes)
+                    val divData = DivKitSetup.parseDivData(cardBytes, jsonData)
                     if (divData != null) {
                         val tag = DivDataTag("story_${entryId}_$index")
                         divView.setData(divData, tag)

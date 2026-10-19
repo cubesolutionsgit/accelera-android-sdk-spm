@@ -107,7 +107,7 @@ class StoryEntryPreloader(
         cards.forEachIndexed { index, card ->
             val divView = makeDivView()
             val cardBytes = card.toString().toByteArray(Charsets.UTF_8)
-            val divData = DivKitSetup.parseDivData(cardBytes)
+            val divData = DivKitSetup.parseDivData(cardBytes, jsonData)
             if (divData != null) {
                 val tag = DivDataTag("story_${entryId}_$index")
                 divView.setData(divData, tag)

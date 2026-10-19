@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.yandex.div.json)
     implementation(libs.yandex.div.glide)
     implementation(libs.yandex.div.lottie)
+    implementation(libs.lottie)
     implementation(libs.yandex.div.video)
 
     // Networking

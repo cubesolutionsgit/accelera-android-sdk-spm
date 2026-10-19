@@ -7,6 +7,9 @@ import android.net.Uri
  * Delegate protocol for handling events, actions, logging, and custom API override from Accelera.
  */
 interface AcceleraDelegate {
+    /** Custom fonts shared by DivKit and Lottie. Set before creating content views. */
+    val fontProvider: AcceleraFontProvider? get() = null
+
     /**
      * Called when the library wants to log a message.
      * @param message The log string.
