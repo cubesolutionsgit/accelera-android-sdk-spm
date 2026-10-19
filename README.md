@@ -33,7 +33,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts (app)
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.2")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.3")
 }
 ```
 
@@ -533,7 +533,7 @@ Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
 SDK не скачивает шрифты по произвольным URL: как и в iOS, нужный шрифт должен быть
 подключён приложением. Для точного Teko в Lottie добавьте `fonts/Teko.ttf`.
 
-📄 Версия: `0.6.2`
-📆 Обновлено: август 2026
+📄 Версия: `0.6.3`
+📆 Обновлено: октябрь 2026
 📫 Поддержка: [@cubesolutionsgit](https://github.com/cubesolutionsgit)
 🔗 Репозиторий: [accelera-android-sdk-spm](https://github.com/cubesolutionsgit/accelera-android-sdk-spm)

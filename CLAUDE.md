@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Accelera SDK** — an Android library (`accelera` module) for integrating dynamic content (banners and stories) into apps using [Yandex DivKit](https://divkit.tech/) for rendering. The `app` module is a minimal demo host.
 
-Current version: `0.6.0`, distributed via JitPack (`com.github.cubesolutionsgit:accelera-android-sdk-spm`).
+Current version: `0.6.3`, distributed via JitPack (`com.github.cubesolutionsgit:accelera-android-sdk-spm`).
 
 ## Build Commands
 
@@ -21,7 +21,7 @@ Current version: `0.6.0`, distributed via JitPack (`com.github.cubesolutionsgit:
 ./gradlew :accelera:test
 
 # Run a single test class
-./gradlew :accelera:test --tests "ai.accelera.library.ExampleUnitTest"
+./gradlew :accelera:testDebugUnitTest --tests "ai.accelera.library.utils.AcceleraContentJsonTest"
 
 # Build the demo app
 ./gradlew :app:assembleDebug
@@ -37,7 +37,7 @@ The library is structured around a singleton `Accelera.shared` entry point.
 ### Core Layer (`ai.accelera.library`)
 - `Accelera` — singleton SDK entry point. Holds config, delegate, and API instance. All internal components call back through here for logging (`log`/`error`) and event tracking (`logEvent`).
 - `AcceleraConfig` — serializable data class: `url`, `systemToken`, `userInfo`.
-- `AcceleraDelegate` / `DefaultAcceleraDelegate` — callback interface for logging, URL handling, user actions, and custom API override.
+- `AcceleraDelegate` / `DefaultAcceleraDelegate` — callback interface for logging, URL handling, user actions, custom API override, and host font resolution via `fontProvider`.
 
 ### API Layer (`ai.accelera.library.api`)
 - `AcceleraAPIProtocol` — interface with `loadBanner` and `logEvent`, both callback-based (`(ByteArray?, NetworkError?) -> Unit`).
@@ -72,6 +72,22 @@ Stories fullscreen (`banners/presentation/ui/FullscreenActivity`):
 - Launched with a payload **token** (`EXTRA_PAYLOAD_TOKEN`) + `entryId: String` extras; the JSON itself stays in `AcceleraPayloadRegistry` (raw `EXTRA_JSON_DATA` is legacy fallback only).
 - Playback is orchestrated by `StoryPlaybackCoordinator` + `PlaybackStateMachine` (`banners/presentation/playback`), with `StoryProgressManager` (card timers), `PlayerLifecycleController` (video pause/resume), `EntryViewRepository` (entry containers), `StoryEntryPreloader`, `StoryEventLogger`.
 - Gesture handling via `StoryGestureHandler`: tap left/right for card nav, swipe left/right for entry nav, swipe down to close, long-press to pause progress.
+
+### DivKit Templates, Lottie & Host Fonts
+
+- DivKit version is `32.61.4`; Lottie Android is `6.7.1` (see `gradle/libs.versions.toml`).
+- `DivKitSetup.parseDivData(jsonData, templateSource = jsonData)` loads top-level `templates` into `DivParsingEnvironment` before parsing the card. Extracted story cards must pass the original payload as `templateSource`, including all preloading paths. Do not strip templates or expand them manually.
+- Lottie JSON uses a `gif` element (`gif_url: "empty://"`) with the `lottie` extension; template-bound `$params`, absolute HTTPS `lottie_url`, and `repeat_count: -1` are supported. Errors go through the SDK logger.
+- `AcceleraFontResolver` is shared by DivKit and Lottie within a content view. Fonts belong to the consuming app: automatically resolve TTF/OTF from its `assets/fonts`, or supply `AcceleraDelegate.fontProvider` for `res/font`, XML font families, and custom registries. Return null for unknown families to allow asset/system fallback.
+- Install the font provider before rendering. Recreate views after changing it; font results are cached per view. Do not keep Activity references or font registries globally.
+- Honor `font_family`, `font_weight`, and `font_weight_value`, including expression-based family names. Keep numeric weights 100–900 on Android 9+; AndroidX approximates on older supported versions. Variable fonts must be adapted to the requested weight even when it is 400: their default axis may differ.
+- `AcceleraLottieExtensionHandler` installs fonts before the first drawable frame. Resolve Lottie `fFamily`, `fStyle`, and exact `fName`; preserve separate faces of one family. Never insert a family-wide font-map key that masks other weights. Preserve embedded glyph outlines and fonts from Lottie ZIP files.
+- Missing fonts must fall back to a system font without crashing. Do not bundle demo fonts or customer JSON in the library AAR, and do not download arbitrary font URLs.
+- Regression tests: `AcceleraFontResolverTest` covers asset TTF/OTF, provider priority, fallback, weights, exact faces, glyph preservation, and actual DivKit rendering; `LottieTemplateTest` covers shared templates and animation frame progression. Licensed test fonts belong only in `accelera/src/androidTest/assets/fonts`.
+- Run on an unlocked Android device with its screen on:
+  `./gradlew :accelera:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=ai.accelera.library.banners.infrastructure.divkit.AcceleraFontResolverTest,ai.accelera.library.banners.infrastructure.divkit.LottieTemplateTest`
+  The Lottie playback test loads an HTTPS animation and requires network access. On Windows use `.\gradlew.bat` and quote the entire `-P...` argument in PowerShell.
+- Temporary customer fixtures, local demo screens, and API stubs must be removed before committing. Keep reusable regression tests and their font licenses.
 
 ### State & Lifecycle (in-memory, never in saved instance state)
 Payloads are hundreds of KB, so **nothing content-sized may go into `onSaveInstanceState` or Intent extras** — that overflows the ~1MB Binder limit (`TransactionTooLargeException`). All cross-recreation state lives in process-memory registries under `banners/infrastructure/cache`:
