@@ -33,7 +33,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts (app)
 dependencies {
-    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.3")
+    implementation("com.github.cubesolutionsgit:accelera-android-sdk-spm:0.6.4")
 }
 ```
 
@@ -222,6 +222,10 @@ Accelera.shared.showPopup(
 
 Если Activity или исходный экран уже недоступны, запрос/показ безопасно
 пропускается и исключение не передаётся в приложение.
+
+Если ответ `showPopup` содержит `fullscreens` (stories), SDK открывает первую
+запись как fullscreen-сторис — так же, как при `div-action://fullscreen`, —
+а не как обычный попап.
 
 #### Общий scope переменных
 
@@ -533,7 +537,7 @@ Accelera.shared.setDelegate(object : DefaultAcceleraDelegate() {
 SDK не скачивает шрифты по произвольным URL: как и в iOS, нужный шрифт должен быть
 подключён приложением. Для точного Teko в Lottie добавьте `fonts/Teko.ttf`.
 
-📄 Версия: `0.6.3`
+📄 Версия: `0.6.4`
 📆 Обновлено: октябрь 2026
 📫 Поддержка: [@cubesolutionsgit](https://github.com/cubesolutionsgit)
 🔗 Репозиторий: [accelera-android-sdk-spm](https://github.com/cubesolutionsgit/accelera-android-sdk-spm)

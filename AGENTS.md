@@ -6,7 +6,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 **Accelera SDK** — an Android library (`accelera` module) for integrating dynamic content (banners and stories) into apps using [Yandex DivKit](https://divkit.tech/) for rendering. The `app` module is a minimal demo host.
 
-Current version: `0.6.3`, distributed via JitPack (`com.github.cubesolutionsgit:accelera-android-sdk-spm`).
+Current version: `0.6.4`, distributed via JitPack (`com.github.cubesolutionsgit:accelera-android-sdk-spm`).
 
 ## Build Commands
 
@@ -112,4 +112,5 @@ Payloads are hundreds of KB, so **nothing content-sized may go into `onSaveInsta
 - User info is merged into every outgoing request payload via `Accelera.shared.addUserInfo(to:)`.
 - The API instance is created lazily and reset on `configure()`. Custom API from delegate takes priority over `AcceleraAPI`.
 - Log messages are buffered before a delegate is set and flushed when one is attached.
+- Popup responses containing top-level `fullscreens` open `FullscreenActivity` with the first entry (sorted key), as if `div-action://fullscreen` fired; chosen by `PopupDestinationPolicy`.
 - `FullscreenActivity` and `PopupActivity` must be declared in the consuming app's `AndroidManifest.xml` (the library manifest declares both under the `ai.accelera.library` namespace).
