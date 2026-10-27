@@ -6,6 +6,8 @@ import ai.accelera.library.banners.infrastructure.activity.AcceleraActivityTrack
 import ai.accelera.library.banners.infrastructure.cache.AcceleraPayloadRegistry
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraDivVariableScope
 import ai.accelera.library.banners.infrastructure.divkit.AcceleraScopeRegistry
+import ai.accelera.library.banners.data.repository.StoryDataRepository
+import ai.accelera.library.banners.presentation.ui.FullscreenActivity
 import ai.accelera.library.banners.presentation.ui.PopupActivity
 import ai.accelera.library.utils.parentActivity
 import android.app.Activity
@@ -196,15 +198,26 @@ object AcceleraBanners {
             return
         }
 
+        val destination = PopupDestinationPolicy.resolve(StoryDataRepository(jsonData).loadEntryIds())
+
         val launchResult = PopupLaunchTransaction.launch(
             registerPayload = { AcceleraPayloadRegistry.register(jsonData) },
             registerScope = variableScope?.let { scope ->
                 { AcceleraScopeRegistry.register(scope) }
             },
             startActivity = { payloadToken, scopeToken ->
-                val intent = Intent(presentingActivity, PopupActivity::class.java).apply {
-                    putExtra(PopupActivity.EXTRA_PAYLOAD_TOKEN, payloadToken)
-                    scopeToken?.let { putExtra(PopupActivity.EXTRA_SCOPE_TOKEN, it) }
+                val intent = if (destination is PopupDestination.Fullscreen) {
+                    // Stories payload: behave as if div-action://fullscreen was triggered.
+                    Intent(presentingActivity, FullscreenActivity::class.java).apply {
+                        putExtra(FullscreenActivity.EXTRA_PAYLOAD_TOKEN, payloadToken)
+                        putExtra(FullscreenActivity.EXTRA_ENTRY_ID, destination.entryId)
+                        scopeToken?.let { putExtra(FullscreenActivity.EXTRA_SCOPE_TOKEN, it) }
+                    }
+                } else {
+                    Intent(presentingActivity, PopupActivity::class.java).apply {
+                        putExtra(PopupActivity.EXTRA_PAYLOAD_TOKEN, payloadToken)
+                        scopeToken?.let { putExtra(PopupActivity.EXTRA_SCOPE_TOKEN, it) }
+                    }
                 }
                 presentingActivity.startActivity(intent)
             },

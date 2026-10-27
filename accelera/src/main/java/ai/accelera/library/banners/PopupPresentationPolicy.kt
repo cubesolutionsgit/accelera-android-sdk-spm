@@ -37,6 +37,17 @@ internal object PopupResultPolicy {
     }
 }
 
+/** Picks the screen for a popup response: stories payloads open as if `div-action://fullscreen` fired. */
+internal sealed interface PopupDestination {
+    data class Fullscreen(val entryId: String) : PopupDestination
+    data object Popup : PopupDestination
+}
+
+internal object PopupDestinationPolicy {
+    fun resolve(entryIds: List<String>): PopupDestination =
+        entryIds.firstOrNull()?.let(PopupDestination::Fullscreen) ?: PopupDestination.Popup
+}
+
 /** Ensures a broken or duplicated network callback cannot launch more than one popup. */
 internal class PopupCompletionGate {
     private val completed = AtomicBoolean(false)
